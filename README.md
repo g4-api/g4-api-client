@@ -136,7 +136,7 @@ foreach (var result in results)
 3. **Commit** your changes and push them to your fork.  
 4. Open a **Pull Request** against the `main` branch of this repository.  
 
-We welcome contributions of all types – bug reports, fixes, new features, documentation updates, etc. Please make sure to follow the project’s code style and standards.
+We welcome contributions of all types - bug reports, fixes, new features, documentation updates, etc. Please make sure to follow the project's code style and standards.
 
 ---
 
