@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -20,8 +21,8 @@ namespace G4.IntegrationTests.Framework
     [TestClass]
     [DeploymentItem("Binaries/", "Binaries")]
     [DeploymentItem("Pages/", "Pages")]
-    [DeploymentItem("Resources/", "Resources")]
     [DeploymentItem("appsettings.json")]
+    [SuppressMessage("Design", "MSTEST0016:Test class should have test method", Justification = "Tests are implemented in the derived classes.")]
     public abstract class TestBase
     {
         #region *** Properties   ***
