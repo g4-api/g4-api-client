@@ -331,7 +331,8 @@ jobs:
   NewRelease:
     name: New GitHub Release Version ${{ needs.NewVersion.outputs.buildVersion }}
     runs-on: ubuntu-latest
-    if: ${{ needs.PublishNugetPackages.result == 'success' }}
+    # This job will always run because it always evaluates to true
+    # if: ${{ needs.PublishNugetPackages.result == 'success' }}
     needs:
       - NewVersion
       - PublishNugetPackages
