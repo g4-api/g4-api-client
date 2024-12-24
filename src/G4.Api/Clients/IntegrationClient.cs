@@ -357,6 +357,7 @@ namespace G4.Api.Clients
                     // Build a nested object to represent the manifest details of this driver plugin.
                     Manifest = new G4PluginAttribute
                     {
+                        Categories = ["WebDriverClients"],
                         Description = [attribute.Description],
                         Key = attribute.Driver,
                         PluginType = "Driver",
