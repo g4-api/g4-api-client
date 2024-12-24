@@ -8,6 +8,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -49,14 +50,21 @@ namespace G4.IntegrationTests.Framework
                 ? $"{context.Properties["Grid.Endpoint"]}"
                 : string.Empty;
 
+            // Determine if the test is local
             var isLocal = $"{context.Properties["Integration.Local"]}".Equals("true", StringComparison.OrdinalIgnoreCase);
 
+            // Start the BrowserStack local agent if the grid endpoint contains "browserstack" and the test is not local
             if (remoteEndpoint.Contains("browserstack", StringComparison.OrdinalIgnoreCase) && !isLocal)
             {
+                // Get the file name based on the operating system
+                var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? "BrowserStackLocal.exe"
+                    : "BrowserStackLocal";
+
                 // Start the BrowserStack local agent process
                 var info = new ProcessStartInfo
                 {
-                    FileName = Path.Combine(Directory.GetCurrentDirectory(), "Binaries", "BrowserStackLocal.exe"),
+                    FileName = Path.Combine(Directory.GetCurrentDirectory(), "Binaries", fileName),
                     Arguments = $"--force --key {context.Properties["BrowserStack.Password"]}"
                 };
                 Process.Start(info);
@@ -65,6 +73,24 @@ namespace G4.IntegrationTests.Framework
             // Wait for the process to start (5 seconds)
             Thread.Sleep(TimeSpan.FromSeconds(5));
             context.WriteLine("New test server created successfully.");
+        }
+
+        /// <summary>
+        /// Releases resources used by the test assembly after all tests have run.
+        /// </summary>
+        [AssemblyCleanup]
+        public static void OneTimeTearDown()
+        {
+            // Stop the local static files server
+            WebServer.RemoveWebHost();
+            Console.WriteLine("Web server stopped successfully.");
+
+            // Stop the BrowserStack local agent
+            foreach (var process in Process.GetProcessesByName("BrowserStackLocal"))
+            {
+                Console.WriteLine($"Stopping BrowserStackLocal process '{process.ProcessName}'...");
+                process.Kill(entireProcessTree: true);
+            }
         }
 
         /// <summary>
