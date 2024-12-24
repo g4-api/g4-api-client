@@ -296,6 +296,7 @@ jobs:
     runs-on: ubuntu-latest
     # This job will always run because it always evaluates to true
     # if: ${{ needs.InvokeTests.result == 'success' || needs.InvokeTests.result == 'skipped' }}
+    if: ${{ always() }}
     needs: 
       - InvokeTests
       - NewVersion
