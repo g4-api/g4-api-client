@@ -1,10 +1,8 @@
 # G4.Api
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![NuGet](https://img.shields.io/nuget/v/g4.Api.svg)](https://www.nuget.org/packages/g4.Api)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/g4-api/g4-api-client/dotnet.yml?branch=main)](https://github.com/g4-api/g4-api-client/actions)
-
-**G4.Api** is the official client library for the **G4™ Engine**, providing seamless access to automation, environments, integrations, and templates management. Through its intuitive interfaces, you can quickly leverage the robust features of G4 to build, run, and manage automation workflows, environment parameters, and plugin integrations.
+[![NuGet](https://img.shields.io/nuget/v/g4.api?logo=nuget&label=NuGet)](https://www.nuget.org/packages/g4.Api)
+[![Build, Test & Release](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml/badge.svg)](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml)**G4.Api** is the official client library for the **G4™ Engine**, providing seamless access to automation, environments, integrations, and templates management. Through its intuitive interfaces, you can quickly leverage the robust features of G4 to build, run, and manage automation workflows, environment parameters, and plugin integrations.
 
 ---
 
