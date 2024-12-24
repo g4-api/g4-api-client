@@ -333,6 +333,7 @@ jobs:
     runs-on: ubuntu-latest
     # This job will always run because it always evaluates to true
     # if: ${{ needs.PublishNugetPackages.result == 'success' }}
+    if: ${{ always() }}
     needs:
       - NewVersion
       - PublishNugetPackages
