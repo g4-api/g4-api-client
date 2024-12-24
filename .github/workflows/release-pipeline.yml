@@ -130,7 +130,7 @@ jobs:
 
           - name                  : 'G4.IntegrationTests'
             type                  : 'csproj'
-            filter                : 'TestCategory=MicrosoftEdge'
+            filter                : ''
             prefix                : 'integration-tests-edge'
             artifact              : 'integration-tests-edge-drop-v${{ needs.NewVersion.outputs.buildVersion }}'
             report                : 'integration-tests-edge-results-v${{ needs.NewVersion.outputs.buildVersion }}.xml'
@@ -161,7 +161,7 @@ jobs:
             $workers               = $runSettings.SelectSingleNode("//MSTest//Workers")
             #
             # override with deployment settings
-            $browserStackBuildname.Value = 'G4™ Plugins v${{ env.BUILD_VERSION }}'
+            $browserStackBuildname.Value = 'G4™ API Client v${{ env.BUILD_VERSION }}'
             $browserStackUsername.Value  = '${{ env.BROWSERSTACK_USER }}'
             $browserStackPassword.Value  = '${{ env.BROWSERSTACK_API_KEY }}'
             $g4Username.Value            = '${{ env.G4_API_KEY }}'
