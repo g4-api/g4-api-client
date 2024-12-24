@@ -102,7 +102,9 @@ jobs:
   InvokeTests:
     name: Invoke Tests & Publish Results
     runs-on: windows-latest
-    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' || false}}
+    # This job will never run because it always evaluates to false
+    # if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' }}
+    if: ${{ false }}
     needs: 
       - NewBuild
       - NewVersion
