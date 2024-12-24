@@ -1,0 +1,138 @@
+<html lang="en-us">
+<head>
+	<title>Element Actions</title>
+</head>
+<body onload="initialize();">
+	<div>
+		<p id="LongLine"></p>
+		<textarea id="TextAreaEnabled"
+				  style="white-space: pre;"
+				  name="Enabled Text Area"
+				  rows="5"
+				  onscroll="setElementScroll()"
+				  title="TextAreaEnabled">
+Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor.
+Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.
+Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim.
+Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu.
+In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo.
+Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus.
+Vivamus elementum semper nisi. Aenean vulputate eleifend tellus.
+Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim.
+Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra nulla ut metus varius laoreet.
+Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel augue. Curabitur ullamcorper ultricies nisi.
+Nam eget dui. Etiam rhoncus. Maecenas tempus, tellus eget condimentum rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed ipsum.
+Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem. Maecenas nec odio et ante tincidunt tempus.
+Donec vitae sapien ut libero venenatis faucibus. Nullam quis ante. Etiam sit amet orci eget eros faucibus tincidunt.
+Duis leo. Sed fringilla mauris sit amet nibh. Donec sodales sagittis magna. Sed consequat, leo eget bibendum sodales, augue velit cursus nunc
+        </textarea>
+	</div>
+
+	<div>
+		<span>Top</span>
+		<input type="text"
+			   id="ElementScrollTopOutcome"
+			   value="0"
+			   title="ElementScrollTopOutcome" />
+
+		<span>Left</span>
+		<input type="text"
+			   id="ElementScrollLeftOutcome"
+			   value="0"
+			   title="ElementScrollLeftOutcome" />
+
+		<input type="checkbox"
+			   id="TextAreaSelected"
+			   disabled=""
+			   title="TextAreaSelected" />
+		<label>Text Selected</label>
+	</div>
+
+	<div>
+		<span>Top</span>
+		<input type="text"
+			   id="PageScrollTopOutcome"
+			   value="0"
+			   title="PageScrollTopOutcome" />
+
+		<span>Left</span>
+		<input type="text"
+			   id="PageScrollLeftOutcome"
+			   value="0"
+			   title="PageScrollLeftOutcome" />
+	</div>
+
+	<div id="PageSpace" />
+
+	<script type="text/javascript">
+		/**
+		 * Event listener for scroll events on the document.
+		 * Updates input elements with the scroll position of the window.
+		 */
+		document.addEventListener("scroll", function () {
+			// Set the value of an input element with the ID "PageScrollTopOutcome" to the vertical scroll position of the window
+			document
+				.getElementById('PageScrollTopOutcome')
+				.setAttribute('value', window.scrollY.toString());
+
+			// Set the value of an input element with the ID "PageScrollLeftOutcome" to the horizontal scroll position of the window
+			document
+				.getElementById('PageScrollLeftOutcome')
+				.setAttribute('value', window.scrollX.toString());
+
+			// Return false to prevent default scroll behavior
+			return false;
+		}, false);
+
+		/**
+		 * Event listener for the "select" event on the textarea with the ID "TextAreaEnabled".
+		 * Sets the "checked" attribute to "true" for an element with the ID "TextAreaSelected" when text is selected.
+		 */
+		document.querySelector("#TextAreaEnabled").addEventListener("select", function () {
+			// Get the element with the ID "TextAreaSelected"
+			var flag = document.getElementById("TextAreaSelected");
+
+			// Set the "checked" attribute to "true" when text is selected
+			flag.setAttribute("checked", "true");
+		}, false);
+
+		// Initializes the page by populating elements with long text and line breaks.
+		function initialize() {
+			// Generate long text
+			var longText = '';
+
+			// Append 'a' to longText 500 times
+			for (var i = 0; i < 500; i++) {
+				longText += 'a';
+			}
+			// Set the generated long text to the element with id "LongLine"
+			document.getElementById("LongLine").innerText = longText;
+
+			// Get the div element for page space
+			const pageSpaceDiv = document.getElementById("PageSpace");
+
+			// Add line break elements to create space on the page
+			for (var i = 0; i < 50; i++) {
+				const lineBreakElement = document.createElement("br");
+				pageSpaceDiv.appendChild(lineBreakElement);
+			}
+		}
+
+		// Sets the values of input elements based on the scroll position of another element.
+		function setElementScroll() {
+			// Get the element with the ID "TextAreaEnabled"
+			var element = document.querySelector("#TextAreaEnabled");
+
+			// Set the value of an input element with the ID "ElementScrollTopOutcome" to the scrollTop of element e
+			document
+				.querySelector("#ElementScrollTopOutcome")
+				.setAttribute('value', element.scrollTop);
+
+			// Set the value of an input element with the ID "ElementScrollLeftOutcome" to the scrollLeft of element e
+			document
+				.querySelector("#ElementScrollLeftOutcome")
+				.setAttribute('value', element.scrollLeft);
+		}
+	</script>
+</body>
+</html>

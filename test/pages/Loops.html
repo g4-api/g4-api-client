@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Dual Pagination Example</title>
+	<style>
+		.pagination {
+			display: flex;
+			list-style: none;
+			padding: 0;
+			margin-bottom: 20px;
+		}
+
+			.pagination li {
+				margin: 0 5px;
+			}
+
+			.pagination button {
+				padding: 5px 10px;
+				cursor: pointer;
+			}
+
+				.pagination button[disabled] {
+					opacity: 0.5;
+					cursor: not-allowed;
+				}
+
+			.pagination .active {
+				background-color: #4CAF50;
+				color: white;
+			}
+	</style>
+</head>
+<body>
+	<h1>Page Content</h1>
+
+	<ul class="pagination" id="Pagination1"></ul>
+
+	<button id="FirstBtn1"
+			type="button"
+			onclick="switchToFirstPage(1)"
+			disabled>&lt;&lt; First</button>
+	
+	<button id="PrevBtn1"
+			type="button"
+			onclick="switchPage(1, -1)"
+			disabled>&lt; Previous</button>
+
+	<button id="NextBtn1"
+			type="button"
+			onclick="switchPage(1, 1)">Next &gt;</button>
+
+	<button id="LastBtn1"
+			type="button"
+			onclick="switchToLastPage(1)">Last &gt;&gt;</button>
+
+	<ul class="pagination" id="Pagination2"></ul>
+
+	<button id="FirstBtn2"
+			type="button"
+			onclick="switchToFirstPage(2)"
+			disabled>&lt;&lt; First</button>
+
+	<button id="PrevBtn2"
+			type="button"
+			onclick="switchPage(2, -1)"
+			disabled>&lt; Previous</button>
+
+	<button id="NextBtn2"
+			type="button"
+			onclick="switchPage(2, 1)">Next &gt;</button>
+
+	<button id="LastBtn2"
+			type="button"
+			onclick="switchToLastPage(2)">Last &gt;&gt;</button>
+
+	<script>
+		// Current page number for pagination set 1
+		let currentPage1 = 1;
+
+		// Current page number for pagination set 2
+		let currentPage2 = 1;
+
+		// Total number of pages
+		const totalPages = 10;
+
+		// Switches to the first page of pagination.
+		function switchToFirstPage(pagination) {
+			// Check if pagination is for the first set and current page is not already the first page
+			if (pagination === 1 && currentPage1 !== 1) {
+				// Update the current page number for the first set to 1
+				currentPage1 = 1;
+
+				// Call a function to update the pagination UI for the first set
+				updatePagination(1);
+			}
+			// Check if pagination is for the second set and current page is not already the first page
+			else if (pagination === 2 && currentPage2 !== 1) {
+				// Update the current page number for the second set to 1
+				currentPage2 = 1;
+
+				// Call a function to update the pagination UI for the second set
+				updatePagination(2);
+			}
+		}
+
+		// Switches to the last page of pagination.
+		function switchToLastPage(pagination) {
+			// Check if pagination is for the first set and current page is not already the last page
+			if (pagination === 1 && currentPage1 !== totalPages) {
+				// Update the current page number for the first set to the total number of pages
+				currentPage1 = totalPages;
+
+				// Call a function to update the pagination UI for the first set
+				updatePagination(1);
+			}
+			// Check if pagination is for the second set and current page is not already the last page
+			else if (pagination === 2 && currentPage2 !== totalPages) {
+				// Update the current page number for the second set to the total number of pages
+				currentPage2 = totalPages;
+
+				// Call a function to update the pagination UI for the second set
+				updatePagination(2);
+			}
+		}
+
+		// Changes the current page number for pagination.
+		function switchPage(pagination, offset) {
+			// Check if pagination is for the first set
+			if (pagination === 1) {
+				// Update the current page number for the first set
+				currentPage1 += offset;
+
+				// Call a function to update the pagination UI for the first set
+				updatePagination(1);
+			}
+			// Check if pagination is for the second set
+			else if (pagination === 2) {
+				// Update the current page number for the second set
+				currentPage2 += offset;
+
+				// Call a function to update the pagination UI for the second set
+				updatePagination(2);
+			}
+		}
+
+		// Updates the pagination UI based on the current page and total pages.
+		function updatePagination(pagination) {
+			// Get the pagination element by ID
+			const paginationElement = document.getElementById(`Pagination${pagination}`);
+
+			// Clear the existing content of the pagination element
+			paginationElement.innerHTML = '';
+
+			// Determine which currentPage to use based on pagination number
+			const currentPage = pagination === 1 ? currentPage1 : currentPage2;
+
+			// Iterate through each page
+			for (let i = 1; i <= totalPages; i++) {
+				// Create list item and button elements
+				const li = document.createElement('li');
+				const button = document.createElement('button');
+
+				// Set button text content to page number
+				button.textContent = i;
+
+				// Set button type to "button" to prevent form submission
+				button.type = "button";
+
+				// Attach onclick event to switch page when button is clicked
+				button.onclick = () => switchPage(pagination, i - currentPage);
+
+				// Set attribute for automation
+				button.setAttribute("automation", "foo bar");
+
+				// Add 'active' class to button if it represents the current page
+				if (i === currentPage) {
+					button.classList.add('active');
+				}
+
+				// Append button to list item, and list item to pagination element
+				li.appendChild(button);
+				paginationElement.appendChild(li);
+			}
+
+			// Disable navigation buttons if current page is the first or last page
+			document.getElementById(`PrevBtn${pagination}`).disabled = currentPage === 1;
+			document.getElementById(`NextBtn${pagination}`).disabled = currentPage === totalPages;
+			document.getElementById(`FirstBtn${pagination}`).disabled = currentPage === 1;
+			document.getElementById(`LastBtn${pagination}`).disabled = currentPage === totalPages;
+		}
+
+		// Update pagination UI for pagination set 1
+		updatePagination(1);
+
+		// Update pagination UI for pagination set 2
+		updatePagination(2);
+	</script>
+</body>
+</html>

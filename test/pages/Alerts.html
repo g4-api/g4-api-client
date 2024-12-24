@@ -1,0 +1,80 @@
+<html lang="en-us">
+<head>
+	<title>Alert Actions</title>
+</head>
+<body>
+	<div>
+		<button type="button"
+				id="Alert"
+				onclick="alert('This is a custom alert! Click OK to proceed.');">
+			Pop Alert
+		</button>
+
+		<input title="AlertResult"
+			   placeholder="AlertResult"
+			   type="text"
+			   id="AlertResult"
+			   disabled="" />
+	</div>
+
+	<div>
+		<button type="button"
+				id="Confirm"
+				onclick="invokeConfirm();">
+			Pop Confirm
+		</button>
+
+		<input title="ConfirmResult"
+			   placeholder="ConfirmResult"
+			   type="text"
+			   id="ConfirmResult"
+			   disabled="" />
+	</div>
+
+	<div>
+		<button type="button"
+				id="Prompt"
+				onclick="invokePrompt();">
+			Pop Prompt
+		</button>
+
+		<input title="PromptResult"
+			   placeholder="PromptResult"
+			   type="text"
+			   id="PromptResult"
+			   disabled="" />
+	</div>
+
+	<script>
+		// Invokes a custom confirmation dialog.
+		function invokeConfirm() {
+			// Show a custom confirmation dialog and store the result
+			var result = window.confirm('This is a custom alert! Click OK to proceed or Cancel to abort.');
+
+			// Check the result of the confirmation dialog
+			if (result) {
+				// If OK is clicked, set the value of ConfirmResult element to 'OK clicked'
+				document.getElementById('ConfirmResult').setAttribute('value', 'OK clicked');
+			} else {
+				// If Cancel is clicked, set the value of ConfirmResult element to 'Cancel clicked'
+				document.getElementById('ConfirmResult').setAttribute('value', 'Cancel clicked');
+			}
+		}
+
+		// Invokes a prompt dialog to collect user input.
+		function invokePrompt() {
+			// Display a prompt dialog and store the user input
+			var userInput = prompt("Please enter your name:");
+
+			// Check if the user input is not null (i.e., the user clicked OK)
+			if (userInput !== null) {
+				// If the user provided input, set the value of PromptResult element to the input
+				document.getElementById('PromptResult').setAttribute('value', userInput);
+			} else {
+				// If the user canceled the prompt (clicked Cancel or closed the dialog), set the value of PromptResult element accordingly
+				document.getElementById('PromptResult').setAttribute('value', 'You canceled the prompt');
+			}
+		}
+	</script>
+</body>
+</html>

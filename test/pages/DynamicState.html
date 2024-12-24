@@ -1,0 +1,380 @@
+<html lang="en-us">
+<head>
+	<title>Element Conditions</title>
+</head>
+<body>
+	<div>
+		<button type="button"
+				id="NewAlertButton"
+				onclick="showAlert();">
+			New Alert
+		</button>
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="switchElementState('ElementActive');">
+			Toggle Element
+		</button>
+
+		<input type="text"
+			   id="ElementActive"
+			   placeholder="ElementActive"
+			   title="ElementActive" />
+	</div>
+
+	<div>
+		<button type="button"
+				id="ElementAttributeSwitch"
+				onclick="setElementAttribute('ElementAttribute', 'value', 'Foo Bar');">
+			Set Attribute
+		</button>
+
+		<input type="text"
+			   id="ElementAttribute"
+			   placeholder="ElementAttribute"
+			   title="ElementAttribute" />
+	</div>
+
+	<div id="ElementCount">
+		<button type="button"
+				id="ElementCountSwitch"
+				onclick="addElements('ElementCount', 3);">
+			Add Elements
+		</button>
+	</div>
+
+	<div id="ElementCountDecrease">
+		<button type="button" id="ElementCountDecreaseSwitch" onclick="deleteElements('ElementCountDecrease', 3);">
+			Delete Elements
+		</button>
+
+		<span automation-data="ElementCount"> Element1</span>
+		<span automation-data="ElementCount"> Element2</span>
+		<span automation-data="ElementCount"> Element3</span>
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="switchElementState('ElementEnabled');">
+			Toggle Element
+		</button>
+
+		<input type="text"
+			   id="ElementEnabled"
+			   placeholder="ElementEnabled"
+			   title="ElementEnabled" />
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="switchElementState('ElementDisabled');">
+			Toggle Element
+		</button>
+
+		<input type="text"
+			   id="ElementDisabled"
+			   placeholder="ElementDisabled"
+			   title="ElementDisabled"
+			   disabled />
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="deleteElement('ElementExists');">
+			Delete Element
+		</button>
+
+		<input type="text"
+			   id="ElementExists"
+			   placeholder="ElementExists"
+			   title="ElementExists" />
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="switchCheckboxState('ElementNotSelected');">
+			Toggle Element
+		</button>
+
+		<input type="checkbox"
+			   id="ElementNotSelected"
+			   placeholder="ElementNotSelected"
+			   title="ElementNotSelected" />
+
+		<button type="button"
+				onclick="switchCheckboxState('ElementSelected');">
+			Toggle Element
+		</button>
+
+		<input type="checkbox"
+			   id="ElementSelected"
+			   placeholder="ElementSelected"
+			   title="ElementSelected"
+			   checked />
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="switchElementVisibility('ElementVisible');">
+			Hide/Show Element
+		</button>
+
+		<input type="text"
+			   id="ElementVisible"
+			   placeholder="ElementVisible"
+			   title="ElementVisible" />
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="setElementText('ElementText', 'Foo Bar');">
+			Set Element Text
+		</button>
+
+		<span id="ElementText">Element Text</span>
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="setPageTitle('Foo Bar');">
+			Set Page Title
+		</button>
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="editUrl();">
+			Edit Url
+		</button>
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="openNewTabs(3, 2000);">
+			Open New Tabs
+		</button>
+	</div>
+
+	<div>
+		<button type="button"
+				onclick="openAndCloseTabs(3, 2000);">
+			Open And Close Tabs
+		</button>
+	</div>
+
+	<div id="StaleContainer">
+		<input type="button"
+			   id="SetStaleElement"
+			   value="SetStaleElement"
+			   onclick="setStaleElement()" />
+		<p id="StaleElement">This paragraph is not stale</p>
+	</div>
+
+	<script>
+		// Function to dynamically add elements to a container
+		function addElements(parentId, numberOfElements) {
+			// Get the container element
+			var div = document.getElementById(parentId);
+
+			// Loop to create and append elements
+			for (var count = 1; count <= numberOfElements; count++) {
+
+				// Set a timeout with a delay proportional to the count
+				setTimeout(function (currentCount) {
+					// Return a function to create and append the element
+					return function () {
+						// Create a new span element
+						var newElement = document.createElement("span");
+
+						// Set attribute for automation (optional)
+						newElement.setAttribute("automation-data", "ElementCount");
+
+						// Set text content for the new element
+						newElement.textContent = " Element" + currentCount;
+
+						// Append the new element to the container
+						div.appendChild(newElement);
+					};
+				}(count), count * 2000);
+			}
+		}
+
+		// Function to delete a specified number of elements from a parent container
+		function deleteElements(parentId, numberOfElements) {
+			// Loop through the elements to be deleted
+			for (var count = 0; count < numberOfElements; count++) {
+				// Set a timeout for each deletion with a delay proportional to the count
+				setTimeout(function () {
+					// Return a function to remove the element from the parent
+					return function () {
+						// Get the first element within the parent container
+						var element = document.querySelector(`#${parentId} > span`);
+						// Remove the current element from its parent container
+						document.getElementById(parentId).removeChild(element);
+					};
+				}(count), count * 2000); // Delay is calculated based on count
+			}
+		}
+
+		// Function to delete an element after 3 seconds
+		function deleteElement(elementId) {
+			// Get the element to be deleted
+			var element = document.getElementById(elementId);
+
+			// Set a timeout to execute after 3 seconds
+			// Remove the element from its parent node
+			setTimeout(function () {
+				element.parentNode.removeChild(element);
+			}, 3000);
+		}
+
+		// Function to navigate to the current URL with a query parameter after 3 seconds
+		function editUrl() {
+			setTimeout(function () {
+				// Get the current URL
+				var currentUrl = window.location.href;
+
+				// Append the query parameter
+				var newUrl = currentUrl + (currentUrl.includes('?') ? '&' : '?') + 'value=FooBar';
+
+				// Navigate to the new URL
+				window.location.href = newUrl;
+			}, 3000);
+		}
+
+		// Function to open new tabs with about:blank URLs every x second
+		function openNewTabs(numberOfTabs, interval) {
+			for (let i = 0; i < numberOfTabs; i++) {
+				setTimeout(function () {
+					// Open a new tab with about:blank URL
+					window.open('about:blank', '_blank');
+				}, i * interval); // Delay each tab opening by i seconds
+			}
+		}
+
+		// Function to open new tabs and close them one by one every x second
+		function openAndCloseTabs(numberOfTabs, interval) {
+			// Array to store references to the opened tabs
+			var tabs = [];
+
+			// Open the new tabs
+			for (let i = 0; i < numberOfTabs; i++) {
+				tabs.push(window.open('about:blank', '_blank'));
+			}
+
+			// Close the tabs one by one
+			for (let i = 0; i < tabs.length; i++) {
+				setTimeout(function () {
+					tabs[i].close();
+				}, (i + 1) * interval); // Close the tab after (i + 1) seconds
+			}
+		}
+
+		// Function to show an alert after 3 seconds
+		function showAlert() {
+			// Set a timeout of 3 seconds
+			// Display an alert after 3 seconds
+			setTimeout(function () {
+				alert("Alert triggered after 3 seconds");
+			}, 3000);
+		}
+
+		// Function to set an attribute of an element after 3 seconds
+		function setElementAttribute(elementId, attributeName, attributeValue) {
+			// Get the element with the provided id
+			var element = document.getElementById(elementId);
+
+			// Set a timeout to execute after 3 seconds
+			// Set the specified attribute of the element
+			setTimeout(function () {
+				element.setAttribute(attributeName, attributeValue);
+			}, 3000);
+		}
+
+		// Function to set an text of an element after 3 seconds
+		function setElementText(elementId, text) {
+			// Get the element with the provided id
+			var element = document.getElementById(elementId);
+
+			// Set a timeout to execute after 3 seconds
+			// Set the specified text of the element
+			setTimeout(function () {
+				element.innerText = text;
+			}, 3000);
+		}
+
+		// Function to set a stale element after 3 seconds
+		function setStaleElement() {
+			// Set a timeout to execute after 3 seconds
+			setTimeout(function () {
+				// Get the container and existing stale element
+				var container = document.getElementById('StaleContainer');
+				var element = document.getElementById('StaleElement');
+
+				// Remove the existing stale element from the container
+				container.removeChild(element);
+
+				// Create a new paragraph element to replace the stale element
+				var newElement = document.createElement('p');
+				newElement.id = 'StaleElement';
+				newElement.innerText = 'This paragraph is stale';
+
+				// Append the new element to the container
+				container.appendChild(newElement);
+			}, 3000);
+		}
+
+		// Function to change the document title after a delay
+		function setPageTitle(newTitle) {
+			// Set a timeout to execute the function after 3000 milliseconds (3 seconds)
+			setTimeout(function () {
+				// Set the document title to the new title
+				document.title = newTitle;
+			}, 3000);
+		}
+
+		// Function to toggle the state of a checkbox after 3 seconds
+		function switchCheckboxState(elementId) {
+			// Set a timeout to execute after 3 seconds
+			// Get the checkbox element with the provided id
+			// Toggle the checked state of the checkbox
+			setTimeout(function () {
+				var checkbox = document.getElementById(elementId);
+				checkbox.checked = !checkbox.checked;
+			}, 3000);
+		}
+
+		// Function to toggle the state of an element after 3 seconds
+		function switchElementState(elementId) {
+			// Get the element with the provided id
+			var element = document.getElementById(elementId);
+
+			// Set a timeout to execute after 3 seconds
+			// Toggle the disabled state of the element
+			setTimeout(function () {
+				element.disabled = !element.disabled;
+				if (!element.disabled) {
+					element.focus();
+				}
+			}, 3000);
+		}
+
+		// Function to toggle the visibility of an element after 3 seconds
+		function switchElementVisibility(elementId) {
+			// Set a timeout to execute after 3 seconds
+			setTimeout(function () {
+				// Get the element with the provided id
+				var element = document.getElementById(elementId);
+
+				// Check the current display style of the element
+				// If the element is currently hidden, show it
+				// If the element is currently visible, hide it
+				element.style.display = element.style.display === "none"
+					? "block"
+					: "none";
+			}, 3000);
+		}
+	</script>
+</body>
+</html>

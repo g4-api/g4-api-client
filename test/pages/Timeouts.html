@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebDriver Timeout Test Page</title>
+    <script>
+        // Function to simulate blocking load using a while loop
+        function simulateBlockingLoad() {
+            const loadingResult = document.getElementById('loadingResult');
+            loadingResult.textContent = 'Result: Simulating blocking page load...';
+
+            // Simulate a blocking load by freezing the main thread
+            const startTime = new Date().getTime();
+            while (new Date().getTime() - startTime < 15000) {
+                // Busy wait for 15 seconds to simulate blocking
+            }
+
+            loadingResult.textContent = 'Result: Blocking load complete after delay';
+        }
+
+        // Function to simulate delayed appearance of an element
+        function simulateElementFindTimeout() {
+            const elementFindResult = document.getElementById('elementFindResult');
+            elementFindResult.textContent = 'Result: Waiting for element to appear...';
+
+            setTimeout(() => {
+                const dynamicElement = document.createElement('p');
+                dynamicElement.textContent = 'Dynamic Element Loaded';
+                document.getElementById('dynamicElementContainer').appendChild(dynamicElement);
+                elementFindResult.textContent = 'Result: Element found after delay';
+            }, 15000); // 15-second delay
+        }
+
+        // Function to simulate a long-running asynchronous script
+        function simulateAsyncScriptTimeout() {
+            const asyncScriptResult = document.getElementById('asyncScriptResult');
+            asyncScriptResult.textContent = 'Result: Running long async script...';
+
+            new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve('Async script completed');
+                }, 15000); // 15-second delay
+            }).then(result => {
+                asyncScriptResult.textContent = 'Result: ' + result;
+            });
+        }
+
+        // Check for query string parameter and trigger blocking load if found
+        function checkQueryString() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('blockLoad') && urlParams.get('blockLoad') === 'true') {
+                simulateBlockingLoad();
+            }
+        }
+
+        // Run check on page load
+        window.onload = checkQueryString;
+    </script>
+</head>
+<body>
+
+    <header>
+        <h1>WebDriver Timeout Test Page</h1>
+    </header>
+
+    <div>
+        <h2>Test Blocking Page Load</h2>
+        <button type="button" onclick="simulateBlockingLoad()">Simulate Blocking Page Load</button>
+        <p id="loadingResult">Result: Not started</p>
+    </div>
+
+    <div>
+        <h2>Test Element Find Timeout</h2>
+        <button type="button" onclick="simulateElementFindTimeout()">Simulate Delayed Element Appearance</button>
+        <p id="elementFindResult">Result: Not started</p>
+        <div id="dynamicElementContainer"></div>
+    </div>
+
+    <div>
+        <h2>Test Async Script Timeout</h2>
+        <button type="button" onclick="simulateAsyncScriptTimeout()">Simulate Long Async Script</button>
+        <p id="asyncScriptResult">Result: Not started</p>
+    </div>
+
+</body>
+</html>

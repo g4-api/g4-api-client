@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Window Size and Position</title>
+</head>
+<body>
+	<div>
+		<label for="Width">Window Width:</label>
+		<input type="text"
+			   id="Width"
+			   title="Width"
+			   placeholder="Width"
+			   readonly />
+	</div>
+
+	<div>
+
+		<label for="Height">Window Height:</label>
+		<input type="text"
+			   id="Height"
+			   title="Height"
+			   placeholder="Height"
+			   readonly />
+	</div>
+
+	<div>
+		<label for="X">Window X Position:</label>
+		<input type="text"
+			   id="X"
+			   title="X"
+			   placeholder="X"
+			   readonly />
+	</div>
+
+	<div>
+		<label for="Y">Window Y Position:</label>
+		<input type="text"
+			   id="Y"
+			   title="Y"
+			   placeholder="Y"
+			   readonly />
+	</div>
+
+	<div>
+		<label for="Y">Window Rectangle:</label>
+		<input type="text"
+			   id="Rectangle"
+			   title="Rectangle"
+			   placeholder="Rectangle"
+			   readonly />
+	</div>
+
+	<script>
+		/**
+		 * Function to execute when the DOM is fully loaded.
+		 */
+		document.addEventListener("DOMContentLoaded", function () {
+			// Get references to the input elements
+			const widthElement = document.getElementById('Width');
+			const heightElement = document.getElementById('Height');
+			const xElement = document.getElementById('X');
+			const yElement = document.getElementById('Y');
+			const rectangleElement = document.getElementById('Rectangle');
+
+			/**
+			 * Function to update the window information.
+			 * Retrieves the current window width, height, X position, and Y position
+			 * and updates the corresponding input elements.
+			 */
+			function updateWindowInfo() {
+				// Get the current window width, height, X position, and Y position
+				const width = window.outerWidth;
+				const height = window.outerHeight;
+				const x = window.screenX;
+				const y = window.screenY;
+
+				// Update the input elements with the current window information
+				widthElement.value = `${width}`;
+				heightElement.value = `${height}`;
+				xElement.value = `${x}`;
+				yElement.value = `${y}`;
+				rectangleElement.value = `H:${height} W:${width} X:${x} Y:${y}`;
+			}
+
+			// Update the window info every 100 milliseconds
+			setInterval(updateWindowInfo, 100);
+		});
+	</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+	<title>Export Data</title>
+</head>
+<body>
+	<h1>Hotel Search Results</h1>
+
+	<div class="search-bar">
+		<input type="text" id="SearchInput" placeholder="Enter a location">
+		<button type="button" onclick="findHotels()">Search</button>
+	</div>
+
+	<div>
+		<img src="http://localhost:9002/test/static/ImageA.png" alt="ImageA" />
+		<img src="http://localhost:9002/test/static/ImageB.png" alt="ImageB" />
+		<img src="http://localhost:9002/test/static/ImageC.png" alt="ImageC" />
+
+		<p>Image A: http://localhost:9002/test/static/ImageA.png</p>
+		<p>Image B: http://localhost:9002/test/static/ImageB.png</p>
+		<p>Image C: http://localhost:9002/test/static/ImageC.png</p>
+	</div>
+
+	<div class="results">
+		<div class="hotel"
+			 data-location="City A"
+			 data-price="$100 per night"
+			 data-rating="4.5 stars"
+			 data-amenities="Free Wi-Fi, Pool, Restaurant"
+			 data-description="Lorem ipsum dolor sit amet, consectetur adipiscing elit"
+			 data-pet-friendly="true"
+			 data-last-updated="2023-10-28T15:30:00">
+
+			<h2>Hotel 1</h2>
+			<p>Location: City A</p>
+			<p>Price: $100 per night</p>
+			<p>Rating: 4.5 stars</p>
+			<p>Amenities: Free Wi-Fi, Pool, Restaurant</p>
+			<p>Description: Lorem ipsum dolor sit "amet", consectetur adipiscing elit.</p>
+			<p>Pet Friendly: Yes</p>
+
+			<pre>Description:
+				Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+			</pre>
+
+			<button type="button" onclick="switchDetailsVisibility(this)">Show More</button>
+		</div>
+
+		<div class="hotel"
+			 data-location="City B"
+			 data-price="$120 per night"
+			 data-rating="4.8 stars"
+			 data-amenities="Free Parking, Gym, Spa"
+			 data-description="Nullam et arcu bibendum, tristique ex in, efficitur libero"
+			 data-pet-friendly="false"
+			 data-last-updated="2023-10-28">
+
+			<h2>Hotel 2</h2>
+			<p>Location: City B</p>
+			<p>Price: $120 per night</p>
+			<p>Rating: 4.8 stars</p>
+			<p>Amenities: Free Parking, Gym, Spa</p>
+			<p>Description: Nullam et arcu bibendum, "tristique" ex in, efficitur libero.</p>
+			<p>Pet Friendly: No</p>
+
+			<pre>Description:
+				Nullam et arcu bibendum, tristique ex in, efficitur libero.
+			</pre>
+
+			<button type="button" onclick="switchDetailsVisibility(this)">Show More</button>
+		</div>
+	</div>
+
+	<script>
+		// This function finds hotels based on the search input.
+		function findHotels() {
+			// Get the search input value
+			const searchInput = document.getElementById('SearchInput').value;
+
+			// Get all elements with the class "hotel"
+			const hotels = document.querySelectorAll('.hotel');
+
+			// Loop through each hotel element
+			for (const hotel of hotels) {
+				// Get the location text of the hotel
+				const location = hotel.querySelector('p:nth-child(2)').textContent;
+
+				// Check if the location text contains the search input (case insensitive)
+				if (location.toLowerCase().includes(searchInput.toLowerCase())) {
+					// If the location matches the search input, display the hotel
+					hotel.style.display = 'block';
+				} else {
+					// If the location does not match the search input, hide the hotel
+					hotel.style.display = 'none';
+				}
+			}
+		}
+
+		// This function toggles the visibility of hotel details when a button is clicked.
+		function switchDetailsVisibility(button) {
+			// Get the parent element of the button, which is the hotel container
+			const hotel = button.parentElement;
+
+			// If more details are already visible, remove them
+			if (hotel.querySelector('.more-details')) {
+				// Remove the element with the class 'more-details' from the hotel container
+				hotel.removeChild(hotel.querySelector('.more-details'));
+
+				// Change the button text to indicate showing more details
+				button.textContent = 'Show More';
+			} else {
+				// If more details are not visible, create and append them
+				const moreDetails = document.createElement('div');
+
+				// Add class to style more details
+				moreDetails.classList.add('more-details');
+
+				// Populate more details with information
+				moreDetails.innerHTML = `
+					<p>Contact: example@example.com</p>
+					<p>Phone: +123456789</p>
+					<p>Check-in: 3:00 PM</p>
+					<p>Check-out: 11:00 AM</p>`;
+
+				// Append more details to the hotel container
+				hotel.appendChild(moreDetails);
+
+				// Change the button text to indicate showing less details
+				button.textContent = 'Show Less';
+			}
+		}
+	</script>
+</body>
+</html>

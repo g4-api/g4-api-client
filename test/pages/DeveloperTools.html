@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CDP Debugger and Network Traffic Test</title>
+	<script>
+        // Function to simulate some processing with debugging
+        function testFunction() {
+            console.log("Function start");
+            console.log("After first debugger");
+
+            let sum = 0;
+            for (let i = 0; i < 5; i++) {
+                sum += i;
+                console.log("Current Sum: " + sum);
+            }
+
+            console.log("Function end");
+            return sum;
+        }
+
+        // Function to generate fake network traffic
+        function generateFakeNetworkTraffic() {
+            // Simulating a network request to a localhost endpoint
+            fetch('http://localhost:9002/api/v1/g4/ping', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Network response received:", data);
+            })
+            .catch(error => {
+                console.error("Network request failed:", error);
+            });
+        }
+
+        // Function to generate fake console logs of different levels
+        function generateFakeConsoleLogs() {
+            console.log("This is a log message (info level).");
+            console.info("This is an info message.");
+            console.warn("This is a warning message.");
+            console.error("This is an error message.");
+            console.debug("This is a debug message.");
+        }
+
+        // On page load, run the test function and generate fake traffic/logs
+        window.onload = function() {
+            console.log("Page Loaded");
+            testFunction();
+            generateFakeNetworkTraffic();
+            generateFakeConsoleLogs();
+        };
+	</script>
+</head>
+<body>
+	<h1>Chrome DevTools Protocol (CDP) Debugger and Network Traffic Test</h1>
+	<p>This page is designed to test removing debugging, generating fake network traffic, and console logs using CDP.</p>
+	<button type="button" onclick="testFunction()">Run Test Function</button>
+	<button type="button" onclick="generateFakeNetworkTraffic()">Generate Fake Network Traffic</button>
+	<button type="button" onclick="generateFakeConsoleLogs()">Generate Fake Console Logs</button>
+</body>
+</html>

@@ -1,0 +1,129 @@
+﻿<html lang="en-us">
+<head>
+    <title>Element Text Inputs</title>
+    <script>
+		// This function sets the scroll values of an element with the ID "TextAreaEnabled"
+		// into two hidden input fields with IDs "ScrollOutcomeX" and "ScrollOutcomeY",
+		// representing the horizontal and vertical scroll positions, respectively.
+		function setElementScroll() {
+			// Get the element with the ID TextAreaEnabled
+			var element = document.querySelector("#TextAreaEnabled");
+
+			// Set the horizontal scroll value to a hidden input field with ID ScrollOutcomeX
+            document.querySelector("#ScrollOutcomeX").setAttribute('value', element.scrollLeft);
+
+			// Set the vertical scroll value to a hidden input field with ID ScrollOutcomeY
+			document.querySelector("#ScrollOutcomeY").setAttribute('value', element.scrollTop);
+		}
+    </script>
+</head>
+<body>
+    <div id="UrlDivText">Lorem ipsum dolor</div>
+    <input type="text"
+           title="L         * orem ipsum dolor"
+           placeholder="Lorem ipsum dolor"
+           id="InputDisabled"
+                   * disabled="" />
+    <br /><br />
+
+    <input type="text"
+           title="Lorem ipsum dolor"
+           placeholder="Lorem ipsum dolor"
+           id="InputEnabled" />
+    <br /><br />
+
+    <input type="text"
+           placeholder="enabled input with text"
+           id="InputEnabledWithText"
+           value="Lorem ipsum dolor" />
+    <br /><br />
+
+    <textarea title="Lorem ipsum dolor"
+              placeholder="Lorem ipsum dolor"
+              id="TextAreaEnabled"
+              style="white-space: pre;"
+              name="enabled text area"
+              rows="5"
+              onscroll="setElementScroll()">
+Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor.
+Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.
+Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim.
+Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu.
+In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo.
+Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus.
+Vivamus elementum semper nisi. Aenean vulputate eleifend tellus.
+Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim.
+Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra nulla ut metus varius laoreet.
+Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel augue. Curabitur ullamcorper ultricies nisi.
+Nam eget dui. Etiam rhoncus. Maecenas tempus, tellus eget condimentum rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed ipsum.
+Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem. Maecenas nec odio et ante tincidunt tempus.
+Donec vitae sapien ut libero venenatis faucibus. Nullam quis ante. Etiam sit amet orci eget eros faucibus tincidunt.
+Duis leo. Sed fringilla mauris sit amet nibh. Donec sodales sagittis magna. Sed consequat, leo eget bibendum sodales, augue velit cursus nunc
+        </textarea><br /><br />
+
+    <span class="input-group-text">Y </span>
+    <input title="Lorem ipsum dolor"
+           placeholder="Lorem ipsum dolor"
+           type="text"
+           id="ScrollOutcomeY" />
+
+    <span class="input-group-text">X </span>
+    <input title="Lorem ipsum dolor"
+           placeholder="Lorem ipsum dolor"
+           type="text"
+           class="form-control"
+           id="ScrollOutcomeX">
+
+    <span class="input-group-text">Text Selected </span>
+    <input title="Lorem ipsum dolor"
+           placeholder="Lorem ipsum dolor"
+           type="checkbox"
+           id="TextAreaSelected"
+           disabled="">
+
+    <input title="Lorem ipsum dolor"
+           placeholder="Lorem ipsum dolor"
+           id="InputHidden"
+           type="hidden"
+           value="hidden element" />
+
+    <div>
+        <input title="Input Text"
+               placeholder="Input Text"
+               type="text"
+               id="InputText">
+    </div>
+
+    <script>
+        /**
+        * Add an event listener to the element with the ID "InputText" to detect the key combination "Ctrl+Alt+S".
+        * When the key combination is detected, set the value of the element to "Ctrl+Alt+S detected!".
+		*/
+        document.querySelector("#InputText").addEventListener('keydown', function (event) {
+            // Get the element with the ID "InputText"
+            const inputText = document.getElementById('InputText');
+
+            // Check if the key combination "Ctrl+Alt+S" is detected
+            if (event.ctrlKey && event.altKey && event.key === 's') {
+                // Set the value of the element to "Ctrl+Alt+S detected!"
+                inputText.value = 'Ctrl+Alt+S detected';
+
+                // Prevent the default action of the key combination
+                event.preventDefault();
+            }
+        });
+
+        /**
+		 * Add an event listener to the element with the ID "TextAreaEnabled" to detect text selection.
+		 * When text is selected, set the "checked" attribute of the element with the ID "TextAreaSelected" to "true".
+         */
+		document.querySelector("#TextAreaEnabled").addEventListener("select", function () {
+			// Get the element with the ID "TextAreaSelected"
+            var flag = document.getElementById("TextAreaSelected");
+
+			// Set the "checked" attribute to "true" to indicate that text is selected
+			flag.setAttribute("checked", "true");
+		}, false);
+    </script>
+</body>
+</html>

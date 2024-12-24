@@ -1,0 +1,361 @@
+#
+# Inputs (Action Inputs)  : kebab-case (all lowercase letters with hyphens)
+# Outputs (Action Outputs): camelCase (lowercase first letter with uppercase subsequent words)
+# Environment Variables   : UPPERCASE_WITH_UNDERSCORES
+# Job Names               : PascalCase or Title Case
+# Step IDs                : snake_case or kebab-case
+#
+name: Build, Test & Release
+
+# Permissions for the workflow
+permissions:
+  contents: write
+  checks: write
+  pull-requests: write
+  statuses: write
+
+# Trigger workflow on push to the main branch
+on:
+  push:
+    branches:
+      - main
+
+env:
+  #
+  # Build and release settings
+  ARTIFACT_TYPE       : 'Production'
+  DOTNET_VERSION      : '8.0.x'
+  BINARIES_DIRECTORY  : ${{ github.workspace }}/binaries
+  BUILD_CONFIGURATION : 'Release'
+  SOLUTION_NAME       : 'G4'
+  STAGE_DIRECTORY     : ${{ github.workspace }}/artifact_staging
+  #
+  # Publish settings
+  NUGET_API_KEY       : ${{ secrets.NUGET_PUBLIC_KEY }}
+  NUGET_SOURCE        : ${{ vars.NUGET_PUBLIC_SOURCE }}
+  #
+  # Test settings
+  BROWSERSTACK_API_KEY: ${{ secrets.BROWSERSTACK_API_KEY }}
+  BROWSERSTACK_USER   : ${{ secrets.BROWSERSTACK_USER }}
+  G4_API_KEY          : ${{ secrets.G4_API_KEY }}
+  GRID_ENDPOINT       : ${{ secrets.GRID_ENDPOINT }}
+  RUN_SETTINGS_FILE   : 'Default.runsettings'
+  TEST_WORKERS        : '5'
+
+# Default settings for all run steps
+defaults:
+  run:
+    working-directory: src
+
+jobs:
+  NewVersion:
+    name: New Version
+    runs-on: ubuntu-latest
+    outputs:
+      buildVersion: ${{ steps.parse-version.outputs.version }}
+      validVersion: ${{ steps.validate-version.outputs.valid }}
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Parse Build Version for GitHub Tag
+      id: parse-version
+      shell: pwsh
+      run: echo "version=$(Get-Date -UFormat '%Y.%m.%d').${{ github.run_number }}" >> $env:GITHUB_OUTPUT
+
+    - name: Validate Version ${{ steps.parse-version.outputs.version }}
+      id: validate-version
+      shell: pwsh
+      run: |
+        $version = "${{ steps.parse-version.outputs.version }}"
+        echo "valid=$($version -match '^\d+(\.\d+){3}$')" >> $env:GITHUB_OUTPUT
+
+  NewBuild:
+    name: Restore & Build
+    runs-on: ubuntu-latest
+    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' }}
+    needs: 
+      - NewVersion
+
+    env:
+      BUILD_VERSION: ${{ needs.NewVersion.outputs.buildVersion }}
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: "${{ env.DOTNET_VERSION }}"
+
+    - name: Restore Dependencies
+      shell: pwsh 
+      run: dotnet restore
+
+    - name: Build ${{ env.SOLUTION_NAME }} v${{ env.BUILD_VERSION }}
+      shell: pwsh
+      run: dotnet build
+
+  # Windows is required for Windows specific tests
+  InvokeTests:
+    name: Invoke Tests & Publish Results
+    runs-on: windows-latest
+    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' }}
+    needs: 
+      - NewBuild
+      - NewVersion
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    env:
+      BUILD_VERSION: ${{ needs.NewVersion.outputs.buildVersion }}
+
+    strategy:
+      matrix:
+        test-project:
+          - name                  : 'G4.UnitTests'
+            type                  : 'csproj'
+            filter                : ''
+            prefix                : 'unit-tests'
+            artifact              : 'unit-tests-drop-v${{ needs.NewVersion.outputs.buildVersion }}'
+            report                : 'unit-tests-results-v${{ needs.NewVersion.outputs.buildVersion }}.xml'
+            coverage              : 'unit-tests-coverage-results-v${{ needs.NewVersion.outputs.buildVersion }}.xml'
+            step-title            : 'Unit Tests & Code Coverage'
+            tests-summary-title   : 'Unit Tests Results'
+            coverage-summary-title: 'Unit Tests Code Coverage Results'
+
+          - name                  : 'G4.IntegrationTests'
+            type                  : 'csproj'
+            filter                : 'TestCategory=MicrosoftEdge'
+            prefix                : 'integration-tests-edge'
+            artifact              : 'integration-tests-edge-drop-v${{ needs.NewVersion.outputs.buildVersion }}'
+            report                : 'integration-tests-edge-results-v${{ needs.NewVersion.outputs.buildVersion }}.xml'
+            coverage              : 'integration-tests-edge-coverage-results-v${{ needs.NewVersion.outputs.buildVersion }}.xml'
+            step-title            : 'Microsoft Edge Integration Tests & Code Coverage'
+            tests-summary-title   : 'Microsoft Edge Integration Tests Results'
+            coverage-summary-title: 'Microsoft Edge Integration Tests Code Coverage Results'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set the Default Test Settings File
+        id: set-run-settings
+        shell: pwsh
+        run: |
+            # read test settings
+            $runSettingsFile       = "${{ env.RUN_SETTINGS_FILE }}"
+            $runSettingsFilePath   = (Get-ChildItem -Path . -Filter $runSettingsFile -Recurse).FullName
+            [xml]$runSettings      = Get-Content -Path $runSettingsFilePath
+            #
+            # setup
+            $browserStackBuildname = $runSettings.SelectSingleNode("//Parameter[@name='Build.Name']")
+            $browserStackUsername  = $runSettings.SelectSingleNode("//Parameter[@name='BrowserStack.Username']")
+            $browserStackPassword  = $runSettings.SelectSingleNode("//Parameter[@name='BrowserStack.Password']")
+            $g4Username            = $runSettings.SelectSingleNode("//Parameter[@name='G4.Username']")
+            $gridEndpoint          = $runSettings.SelectSingleNode("//Parameter[@name='Grid.Endpoint']")
+            $workers               = $runSettings.SelectSingleNode("//MSTest//Workers")
+            #
+            # override with deployment settings
+            $browserStackBuildname.Value = 'G4™ Plugins v${{ env.BUILD_VERSION }}'
+            $browserStackUsername.Value  = '${{ env.BROWSERSTACK_USER }}'
+            $browserStackPassword.Value  = '${{ env.BROWSERSTACK_API_KEY }}'
+            $g4Username.Value            = '${{ env.G4_API_KEY }}'
+            $gridEndpoint.Value          = '${{ env.GRID_ENDPOINT }}'
+            $workers.InnerText           = '${{ env.TEST_WORKERS }}'
+            #
+            # save settings
+            $runSettings.Save($runSettingsFilePath)
+            Write-Host "Settings File: $runSettingsFilePath"
+
+            "runSettingsFilePath=$runSettingsFilePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Invoke ${{ matrix.test-project.step-title }}
+        id: invoke-tests
+        shell: pwsh
+        env:
+          RUN_SETTINGS_FILE_PATH: ${{ steps.set-run-settings.outputs.runSettingsFilePath }}
+
+        run: |
+          $projectName            = "${{ matrix.test-project.name }}.${{ matrix.test-project.type }}"
+          $projectFilePath        = (Get-ChildItem -Path . -Filter $projectName -Recurse).FullName
+          $projectDirectoryPath   = [System.IO.Path]::GetDirectoryName($projectFilePath)
+          $runSettingsFilePath    = "${{ env.RUN_SETTINGS_FILE_PATH }}"
+          $testFilterExpression   = "${{ matrix.test-project.filter }}"
+          $dropPath               = "${{ env.STAGE_DIRECTORY }}"
+          $testReportFilePath     = "$dropPath/${{ matrix.test-project.report }}"
+          $coverageReportFilePath = "$dropPath/${{ matrix.test-project.coverage }}"
+          
+          Write-Host "Project Name                  : $projectName"
+          Write-Host "Project File Path             : $projectFilePath"
+          Write-Host "Run Settings File Path        : $runSettingsFilePath"
+          Write-Host "Initial Test Filter Expression: $testFilterExpression"
+          Write-Host "Test Report File Path         : $testReportFilePath"
+          Write-Host "Coverage Report File Path     : $coverageReportFilePath"
+          Write-Host ""
+          Write-Host ""
+          
+          $filterToken         = $testFilterExpression
+          $settingsToken       = $runSettingsFile
+          $loggerToken         = ('"trx;LogFileName=' + $testReportFilePath + '"')
+          $collectToken        = '"Xplat Code Coverage"'
+          $argumentsCollection = @(
+              "test",
+              ('"' + $projectFilePath + '"')
+          )
+          
+          if(![string]::IsNullOrEmpty($testFilterExpression)) {
+              $argumentsCollection += ('--filter "' + $testFilterExpression + '"')
+          }
+          
+          if(![string]::IsNullOrEmpty($runSettingsFilePath)) {
+              $argumentsCollection += ('--settings "' + $runSettingsFilePath + '"')
+          }
+          
+          $argumentsCollection += "-l:" + ('"trx;LogFileName=' + $testReportFilePath + '"')
+          $argumentsCollection += "--collect:" + '"Xplat Code Coverage"'
+
+          $arguments = $argumentsCollection -join " "
+
+          Start-Process -FilePath "dotnet" -ArgumentList $arguments -NoNewWindow -Wait
+          Write-Host "Settings File: $testReportFilePath"
+
+          $coverageXmlPath = Get-ChildItem `
+              -Path $projectDirectoryPath `
+              -Recurse `
+              -Filter 'coverage.cobertura.xml' `
+              -File | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+       
+          if (-not (Test-Path -Path $dropPath)) {
+              New-Item -ItemType Directory -Path $dropPath
+          }
+
+          Copy-Item -Path $coverageXmlPath -Destination $coverageReportFilePath
+          Write-Host "Coverage File: $coverageReportFilePath"
+            
+          "testReportFile=$testReportFilePath"         | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "coverageReportFile=$coverageReportFilePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: New ${{ matrix.test-project.step-title }} Summary File
+        id: new-unit-tests-summary
+        shell: pwsh
+        run: |
+          $testReportFile      = "${{ steps.invoke-tests.outputs.testReportFile }}"
+          $testSummaryFile     = "${{ steps.invoke-tests.outputs.testReportFile }}".Replace(".xml", ".md")
+          $coverageReportFile  = "${{ steps.invoke-tests.outputs.coverageReportFile }}"
+          $coverageSummaryFile = "${{ steps.invoke-tests.outputs.coverageReportFile }}".Replace(".xml", ".md")
+
+          .\scripts/Convert-TrxToMarkdown.ps1 `
+              -Title        "${{ matrix.test-project.tests-summary-title }}" `
+              -TrxPath      $testReportFile `
+              -MarkdownPath $testSummaryFile `
+              -AddDetails `
+              -Level Skip
+
+          .\scripts/Convert-CoberturaToMarkdown.ps1 `
+              -Title            "${{ matrix.test-project.coverage-summary-title }}" `
+              -CoberturaXmlPath $coverageReportFile `
+              -MarkdownPath     $coverageSummaryFile `
+              -AddBadges `
+              -AddPackages
+
+          "testSummaryFile=$testSummaryFile"         | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "coverageSummaryFile=$coverageSummaryFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Publish ${{ matrix.test-project.step-title }} Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.test-project.artifact }}
+          path: ${{ env.STAGE_DIRECTORY }}/${{ matrix.test-project.prefix }}*.*
+
+      - name: Publish ${{ matrix.test-project.step-title }} Summary
+        working-directory: ${{ env.STAGE_DIRECTORY }}
+        shell: pwsh
+        run: |
+          # Find all .md files that start with '${{ matrix.test-project.prefix }}'
+          $unitTestFiles = Get-ChildItem -Path . -Filter "${{ matrix.test-project.prefix }}*.md" -File | Sort-Object -Property Name -Descending
+          
+          # Iterate over each file and output its content
+          foreach ($file in $unitTestFiles) {
+              # Read the content of the coverage report file
+              $content = (Get-Content -Path $file.FullName -Raw)
+
+              # Append the content to the GitHub Actions job summary to display it in the workflow run details
+              $content | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          }
+
+  PublishNugetPackages:
+    name: Publish & Push NuGet Packages v${{ needs.NewVersion.outputs.buildVersion }}
+    runs-on: ubuntu-latest
+    if: ${{ needs.InvokeTests.result == 'success' }}
+    needs: 
+      - InvokeTests
+      - NewVersion
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    env:
+      BUILD_VERSION: ${{ needs.NewVersion.outputs.buildVersion }}
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: New Packages v${{ env.BUILD_VERSION }}
+      shell: pwsh
+      run: dotnet pack -o ${{ env.STAGE_DIRECTORY }} -c ${{ env.BUILD_CONFIGURATION }} /p:Version=${{ env.BUILD_VERSION }}
+      working-directory: src
+
+    - name: Publish Build Artifacts to NuGet Feed
+      shell: pwsh
+      run: |
+        dotnet nuget push "${{ env.STAGE_DIRECTORY }}/*.nupkg" --api-key ${{ env.NUGET_API_KEY }} --source ${{ env.NUGET_SOURCE }}
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages-drop-v${{ env.BUILD_VERSION }}
+        path: ${{ env.STAGE_DIRECTORY }}/*.nupkg
+
+  NewRelease:
+    name: New GitHub Release Version ${{ needs.NewVersion.outputs.buildVersion }}
+    runs-on: ubuntu-latest
+    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' && needs.InvokeTests.result == 'success' && needs.PublishNugetPackages.result == 'success' }}
+    needs:
+      - NewVersion
+      - InvokeTests
+      - PublishNugetPackages
+
+    env:
+      BUILD_VERSION: ${{ needs.NewVersion.outputs.buildVersion }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download Build Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ${{ env.STAGE_DIRECTORY }}
+
+    - name: List Downloaded Files
+      run: |
+        ls -R ${{ env.STAGE_DIRECTORY }}
+
+    - name: Create GitHub Release & Tag v${{ env.BUILD_VERSION }}
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          **/*.zip
+          **/*.nupkg
+        tag_name: v${{ env.BUILD_VERSION }}
+        name: ${{ env.ARTIFACT_TYPE }} v${{ env.BUILD_VERSION }}
+        generate_release_notes: true

@@ -1,0 +1,108 @@
+<html lang="en-us">
+<head>
+	<title>Element Conditions</title>
+</head>
+<body>
+	<div>
+		<button type="button"
+				id="NewAlertButton"
+				onclick="alert('Testing Alert!');">
+			New Alert
+		</button>
+	</div>
+
+	<div>
+		<input type="text"
+			   id="ElementActive"
+			   placeholder="ElementActive"
+			   title="ElementActive" />
+	</div>
+
+	<div>
+		<input type="text"
+			   id="ElementAttribute"
+			   placeholder="ElementAttribute"
+			   title="ElementAttribute" />
+	</div>
+
+	<div>
+		<span automation-data="ElementCount">Element 1</span>
+		<span automation-data="ElementCount">Element 2</span>
+		<span automation-data="ElementCount">Element 3</span>
+	</div>
+
+	<div>
+		<input type="text"
+			   id="ElementEnabled"
+			   placeholder="ElementEnabled"
+			   title="ElementEnabled" />
+	</div>
+
+	<div>
+		<input type="text"
+			   id="ElementDisabled"
+			   placeholder="ElementDisabled"
+			   title="ElementDisabled"
+			   disabled />
+	</div>
+
+	<div>
+		<input type="text"
+			   id="ElementExists"
+			   placeholder="ElementExists"
+			   title="ElementExists" />
+	</div>
+	<div>
+		<input type="checkbox"
+			   id="ElementNotSelected"
+			   placeholder="ElementNotSelected"
+			   title="ElementNotSelected" />
+
+		<input type="checkbox"
+			   id="ElementSelected"
+			   placeholder="ElementSelected"
+			   title="ElementSelected"
+			   checked />
+	</div>
+	<div>
+		<input type="text"
+			   id="ElementVisible"
+			   placeholder="ElementVisible"
+			   title="ElementVisible" />
+	</div>
+
+	<div>
+		<input type="hidden"
+			   id="ElementNotVisible"
+			   placeholder="ElementNotVisible"
+			   title="ElementNotVisible" />
+	</div>
+
+	<div id="StaleContainer">
+		<input type="button"
+			   id="SetStaleElement"
+			   value="SetStaleElement"
+			   onclick="setStaleElement()" />
+		<p id="StaleElement">This paragraph is not stale</p>
+	</div>
+
+	<div>
+		<p id="ElementText">ElementText</p>
+	</div>
+
+	<script>
+		function setStaleElement() {
+			var container = document.getElementById('StaleContainer');
+			var element = document.getElementById('StaleElement');
+
+			container.removeChild(element);
+
+			element = document.createElement('p');
+			element.id = 'StaleElement';
+			element.innerText = 'This paragraph is stale';
+
+			container.appendChild(element);
+		}
+	</script>
+</body>
+</html>

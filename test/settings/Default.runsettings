@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+	<TestRunParameters>
+		<!-- Settings: Selenium Grid -->
+		<Parameter name="Grid.Endpoint" value="E:\Binaries\Automation\WebDrivers" />
+		<Parameter name="BrowserStack.Username" value="" />
+		<Parameter name="BrowserStack.Password" value="" />
+
+		<!-- Settings -->
+		<Parameter name="G4.Username" value="" />
+		<Parameter name="Integration" value="BrowserStack" />
+		<Parameter name="Integration.ApplicationUnderTest" value="http://localhost:9002/test/static/" />
+		<Parameter name="Integration.Selenium.Version" value ="4.8.0" />
+		<Parameter name="Integration.AttemptsDelay" value="15000" />
+		<Parameter name="Integration.LoadTimeout" value="60000" />
+		<Parameter name="Integration.NumberOfAttempts" value="5" />
+		<Parameter name="Integration.SearchTimeout" value="15000" />
+		<!-- Local Testing: Set to `false` in order to run on BrowserStack with local agent. -->
+		<!-- Local Testing: Set to `true` in order to run using local WebDriver binaries. -->
+		<Parameter name="Integration.Local" value ="false" />
+
+		<!-- Settings: Project and Build -->
+		<Parameter name="Build.Name" value="" />
+		<Parameter name="Project.Name" value="G4™ Engine" />
+
+		<!-- Settings: Data -->
+		<Parameter name="Data.ConnectionString" value="Data Source=.\\SQLEXPRESS;Initial Catalog=[catalog];Integrated Security=True" />
+	</TestRunParameters>
+
+	<MSTest>
+		<Parallelize>
+			<Workers>5</Workers>
+			<Scope>MethodLevel</Scope>
+		</Parallelize>
+	</MSTest>
+</RunSettings>

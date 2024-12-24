@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title id="PageTitle">Mock HTML Page</title>
+</head>
+<body>
+    <!-- Frame 1 -->
+    <iframe title="FrameOne" id="FrameOne" srcdoc='
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="Frame1Title">Frame 1</title>
+    </head>
+    <body>
+    <h1 id="Frame1Heading">Frame 1 Content</h1>
+    <label for="input1">Input in Frame 1:</label>
+    <input type="text" id="Input1" name="input1">
+
+    <!-- Nested Frame: FrameThree -->
+    <iframe title="FrameThree"
+            id="FrameThree"
+            src="ElementFind.html"
+            width="300"
+            height="200"
+            frameborder="0" />
+
+    </body>
+    </html>' width="300" height="200" frameborder="0">
+    </iframe>
+
+    <!-- Frame 2 -->
+    <iframe title="FrameTwo" id="FrameTwo" srcdoc='
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title id="Frame2Title">Frame 2</title>
+        </head>
+        <body>
+            <h1 id="Frame2Heading">Frame 2 Content</h1>
+            <label for="input2">Input in Frame 2:</label>
+            <input type="text" id="Input2" name="input2">
+        </body>
+        </html>' width="300" height="200" frameborder="0">
+    </iframe>
+
+    <!-- Content not in any frame -->
+    <div>
+        <h1 id="MainHeading">Main Content</h1>
+        <p id="MainParagraph">This is the main content not in any frame or iframe.</p>
+    </div>
+
+</body>
+</html>

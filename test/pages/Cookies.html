@@ -1,0 +1,41 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page with Cookies</title>
+    <script>
+        // Function to set a cookie
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + value + expires + "; path=/";
+        }
+
+        // Function to generate a random string of a specified length
+        function newRandomString(length) {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        // Set the cookies when the page loads
+        window.onload = function () {
+			const NIDValue = newRandomString(56); // Generate a random string of 56 characters
+            setCookie("NID", NIDValue, 7);             // Set NID cookie with the generated value
+            setCookie("TestCookie", "TestValue", 7);   // Set another cookie named TestCookie
+        };
+    </script>
+</head>
+<body>
+    <h1>Test Page with Cookies</h1>
+    <p>This page sets two cookies. One of them is named "NID" and has a meaningless value longer than 55 characters.</p>
+</body>
+</html>

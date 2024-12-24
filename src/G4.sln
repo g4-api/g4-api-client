@@ -1,0 +1,58 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35514.174
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "G4.Api", "G4.Api\G4.Api.csproj", "{1A8CAA18-708E-424A-A7F5-657EADF7FFCB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "G4.IntegrationTests", "G4.IntegrationTests\G4.IntegrationTests.csproj", "{ABB9EFA2-6F2B-4DBC-B895-34874F3F05FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "G4.UnitTests", "G4.UnitTests\G4.UnitTests.csproj", "{3AF2CE97-86A3-42C4-BD4A-8B2753F734A2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".git", ".git", "{B750DFF3-F83D-4E06-8F92-712E1A5B8195}"
+	ProjectSection(SolutionItems) = preProject
+		..\.gitignore = ..\.gitignore
+		..\LICENSE = ..\LICENSE
+		..\README.md = ..\README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{326182B2-0F8C-4BBE-BAEA-7876AC51F422}"
+	ProjectSection(SolutionItems) = preProject
+		..\.github\workflows\release-pipeline.yml = ..\.github\workflows\release-pipeline.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".test", ".test", "{064F4B96-18CF-4E22-A647-44D624BAB6C0}"
+	ProjectSection(SolutionItems) = preProject
+		..\test\settings\Default.runsettings = ..\test\settings\Default.runsettings
+		..\test\settings\Local.runsettings = ..\test\settings\Local.runsettings
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".scripts", ".scripts", "{38AEC001-3A21-48E2-AC8B-5B9100AF4193}"
+	ProjectSection(SolutionItems) = preProject
+		..\scripts\Convert-CoberturaToMarkdown.ps1 = ..\scripts\Convert-CoberturaToMarkdown.ps1
+		..\scripts\Convert-TrxToMarkdown.ps1 = ..\scripts\Convert-TrxToMarkdown.ps1
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1A8CAA18-708E-424A-A7F5-657EADF7FFCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A8CAA18-708E-424A-A7F5-657EADF7FFCB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A8CAA18-708E-424A-A7F5-657EADF7FFCB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A8CAA18-708E-424A-A7F5-657EADF7FFCB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ABB9EFA2-6F2B-4DBC-B895-34874F3F05FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABB9EFA2-6F2B-4DBC-B895-34874F3F05FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABB9EFA2-6F2B-4DBC-B895-34874F3F05FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABB9EFA2-6F2B-4DBC-B895-34874F3F05FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AF2CE97-86A3-42C4-BD4A-8B2753F734A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AF2CE97-86A3-42C4-BD4A-8B2753F734A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AF2CE97-86A3-42C4-BD4A-8B2753F734A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AF2CE97-86A3-42C4-BD4A-8B2753F734A2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

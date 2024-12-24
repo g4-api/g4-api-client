@@ -1,0 +1,506 @@
+﻿<html lang="en-us">
+<head>
+	<script>
+		/**
+		 * Function to execute when the DOM is fully loaded.
+		 */
+		document.addEventListener("DOMContentLoaded", function () {
+			// Initialize variables to store the last known position of the window
+			let lastX = window.screenX;
+			let lastY = window.screenY;
+
+			/**
+			 * Function to check the current position of the window.
+			 * If the position has changed, dispatch a custom 'windowMoved' event.
+			 */
+			function checkWindowPosition() {
+				const currentX = window.screenX;
+				const currentY = window.screenY;
+
+				// If the window's position has changed
+				if (currentX !== lastX || currentY !== lastY) {
+					// Update the last known position
+					lastX = currentX;
+					lastY = currentY;
+
+					// Create and dispatch a custom 'windowMoved' event
+					const event = new Event('windowMoved');
+					window.dispatchEvent(event);
+				}
+			}
+
+			// Set an interval to check the window position every 100 milliseconds
+			setInterval(checkWindowPosition, 100);
+
+			/**
+			 * Event listener for the custom 'windowMoved' event.
+			 * This function updates the value of an input element with ID 'EventOutcome'.
+			 */
+			window.addEventListener('windowMoved', function () {
+				document.getElementById('EventOutcome').setAttribute('value', "window resized");
+			});
+		});
+	</script>
+	<title>Element Actions</title>
+</head>
+<body onscroll="setPageScrollValues();">
+	<div>
+		<input title="SendKeys"
+			   placeholder="SendKeys"
+			   type="text"
+			   id="SendKeys" />
+	</div>
+
+	<div>
+		<input title="EventOutcome"
+			   placeholder="EventOutcome"
+			   type="text"
+			   id="EventOutcome" />
+	</div>
+
+	<div>
+		<input title="ScrollOutcomeY"
+			   placeholder="ScrollOutcomeY"
+			   type="text"
+			   id="ScrollOutcomeY"
+			   value="0"
+			   disabled />
+
+		<input title="ScrollOutcomeX"
+			   placeholder="ScrollOutcomeX"
+			   type="text"
+			   id="ScrollOutcomeX"
+			   value="0"
+			   disabled />
+	</div>
+
+	<div>
+		<p>Mouse X: <span id="MouseXPosition"></span></p>
+		<p>Mouse Y: <span id="MouseYPosition"></span></p>
+	</div>
+
+	<div>
+		<button type="button"
+				id="ClickButton">
+			Click Me
+		</button>
+
+		<input title="ClickButtonOutcome"
+			   placeholder="ClickButtonOutcome"
+			   type="text"
+			   id="ClickButtonOutcome" />
+	</div>
+
+	<div>
+		<button type="button"
+				id="PopAlert"
+				value="0"
+				onclick="setAlertCount();">
+			Pop Alert
+		</button>
+
+		<input title="CurrentNumberOfAlerts"
+			   placeholder="CurrentNumberOfAlerts"
+			   type="text"
+			   id="CurrentNumberOfAlerts"
+			   value="0"
+			   disabled="" />
+
+		<input title="NumberOfAlerts"
+			   placeholder="NumberOfAlerts"
+			   type="number"
+			   id="NumberOfAlerts"
+			   value="10" />
+	</div>
+
+	<div>
+		<a id="Link" href="/test/static/ElementInteractions.html">Link to Click on</a>
+	</div>
+
+	<div>
+		<button type="button"
+				id="UntilAlert"
+				value="0"
+				onclick="confirmAlertsCount();">
+			Number of Clicks Until Alert
+		</button>
+
+		<input title="CurrentNumberOfClicks"
+			   placeholder="CurrentNumberOfClicks"
+			   type="text"
+			   id="CurrentNumberOfClicks"
+			   value="0"
+			   disabled="" />
+
+		<input title="NumberOfClicks"
+			   placeholder="NumberOfClicks"
+			   type="number"
+			   id="NumberOfClicks"
+			   value="10" />
+	</div>
+
+	<div>
+		<button type="button"
+				id="UntilAttribute"
+				value="0"
+				onclick="confirmAttribute();">
+			Number of Clicks Until Attribute
+		</button>
+
+		<input title="AttributeValue"
+			   placeholder="AttributeValue"
+			   type="text"
+			   id="AttributeValue"
+			   value="0"
+			   custom-attribute="0"
+			   disabled="" />
+
+		<input title="NumberOfAttributeClicks"
+			   placeholder="NumberOfAttributeClicks"
+			   type="number"
+			   id="NumberOfAttributeClicks"
+			   value="10" />
+	</div>
+
+	<div>
+		<button type="button"
+				id="UntilDisabled"
+				value="5"
+				numbderOfClicks="0"
+				onclick="confirmDisabled();">
+			Number of Clicks Disabled
+		</button>
+	</div>
+
+	<div>
+		<input title="FocusOutcome"
+			   placeholder="FocusOutcome"
+			   type="text"
+			   id="FocusOutcome"
+			   value="not focused" />
+	</div>
+
+	<div>
+		<input title="KeyboardKeyOutcome"
+			   placeholder="KeyboardKeyOutcome"
+			   type="text"
+			   id="KeyboardKeyOutcome"
+			   value="KeyboardKeyOutcome" />
+
+		<div id="KeyboardKeysList" />
+	</div>
+
+	<div>
+		<select id="SelectElement" title="SelectElement">
+			<option value="option1">Option 1</option>
+			<option value="option2">Option 2</option>
+			<option value="option3">Option 3</option>
+			<option value="option4">Option 4</option>
+		</select>
+	</div>
+
+	<br /><br /><br /><br /><br /><br /><br /><br />
+	<br /><br /><br /><br /><br /><br /><br /><br />
+	<br /><br /><br /><br /><br /><br /><br /><br />
+	<br /><br /><br /><br /><br /><br /><br /><br />
+	<br /><br /><br /><br /><br /><br /><br /><br />
+
+	<div>
+		<input title="MoveOutcome"
+			   placeholder="MoveOutcome"
+			   type="text"
+			   id="MoveOutcome" />
+	</div>
+
+	<script>
+		/**
+		 * Attaches an event listener to the body element to handle the contextmenu event.
+		 * It prevents the default action and updates the EventOutcome input field value.
+		 */
+		document.querySelector("body").addEventListener("contextmenu", function (event) {
+			// Set the value of the EventOutcome input field to indicate the contextmenu event on the body
+			document.getElementById('EventOutcome').setAttribute('value', "context on body");
+
+			// Prevent the default context menu behavior
+			event.preventDefault();
+
+			// Ensure the event does not propagate further
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the document to handle the visibilitychange event.
+		 * It updates the EventOutcome input field value when the visibility of the document changes.
+		 */
+		document.addEventListener("visibilitychange", function () {
+			// Check if the document is hidden
+			if (document.hidden) {
+				// Update the value of the EventOutcome input field to indicate that the window is minimized
+				document.getElementById('EventOutcome').setAttribute('value', "window minimized");
+			}
+		}, false);
+
+		/**
+		 * Attaches an event listener to the body element to handle the dblclick event.
+		 * It updates the EventOutcome input field value when a double-click event occurs on the body.
+		 */
+		document.querySelector("body").addEventListener("dblclick", function (event) {
+			// Update the value of the EventOutcome input field to indicate a double click on the body
+			document.getElementById('EventOutcome').setAttribute('value', "double on body");
+
+			// Prevent the default action for the dblclick event
+			event.preventDefault();
+
+			// Return false to indicate that the event has been handled
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the window to handle the resize event.
+		 * It updates the EventOutcome input field value when the window is resized.
+		 */
+		window.addEventListener("resize", function (event) {
+			// Update the value of the EventOutcome input field to indicate that the window has been resized
+			document.getElementById('EventOutcome').setAttribute('value', "window resized");
+
+			// Prevent the default action for the resize event
+			event.preventDefault();
+
+			// Return false to indicate that the event has been handled
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the document to handle the mousemove event.
+		 * It updates the content of MouseXPosition and MouseYPosition elements with the current mouse coordinates.
+		 */
+		document.addEventListener("mousemove", function (event) {
+			// Update the content of MouseXPosition element with the X coordinate of the mouse
+			document.getElementById("MouseXPosition").textContent = event.clientX;
+
+			// Update the content of MouseYPosition element with the Y coordinate of the mouse
+			document.getElementById("MouseYPosition").textContent = event.clientY;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the dblclick event of the element with ID ClickButton.
+		 * It updates the value of the ClickButtonOutcome element when the element is double-clicked.
+		 */
+		document.querySelector("#ClickButton").addEventListener("dblclick", function (event) {
+			// Update the value of the ClickButtonOutcome element to indicate a double-click on the element
+			document.getElementById('ClickButtonOutcome').setAttribute('value', "double on element");
+
+			// Prevent the default action of the event
+			event.preventDefault();
+
+			// Return false to prevent further propagation of the event
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the focus event of the element with ID FocusOutcome.
+		 * It updates the value of the FocusOutcome element when the element gains focus.
+		 */
+		document.querySelector("#FocusOutcome").addEventListener("focus", function (event) {
+			// Update the value of the FocusOutcome element to indicate that it has been focused
+			document.getElementById('FocusOutcome').setAttribute('value', "focused");
+
+			// Return false to prevent further propagation of the event
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the mouseover event of the element with ID FocusOutcome.
+		 * It updates the value of the FocusOutcome element when the mouse moves over the element.
+		 */
+		document.querySelector("#FocusOutcome").addEventListener("mouseover", function (event) {
+			// Update the value of the FocusOutcome element to indicate that the mouse is over it
+			document.getElementById('FocusOutcome').setAttribute('value', "mouse over");
+
+			// Return false to prevent further propagation of the event
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the contextmenu event of the element with ID ClickButton.
+		 * It updates the value of the ClickButtonOutcome element when the context menu is triggered on the element.
+		 */
+		document.querySelector("#ClickButton").addEventListener("contextmenu", function (event) {
+			// Update the value of the ClickButtonOutcome element to indicate that the context menu was triggered on it
+			document.getElementById('ClickButtonOutcome').setAttribute('value', "context on element");
+
+			// Prevent the default context menu behavior
+			event.preventDefault();
+
+			// Return false to prevent further propagation of the event
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the click event of the element with ID ClickButton.
+		 * It updates the value of the ClickButtonOutcome element when the element is clicked.
+		 */
+		document.querySelector("#ClickButton").addEventListener("click", function (event) {
+			// Update the value of the ClickButtonOutcome element to indicate that the element was clicked
+			document.getElementById('ClickButtonOutcome').setAttribute('value', "click on element");
+
+			// Prevent the default click behavior
+			event.preventDefault();
+
+			// Return false to prevent further propagation of the event
+			return false;
+		}, false);
+
+		/**
+		 * Attaches an event listener to the keyup event of the element with ID KeyboardKeyOutcome.
+		 * It creates a new div element with the name attribute set to the key value,
+		 * and appends it to the KeyboardKeysList element when a key is released.
+		 */
+		document.querySelector("#KeyboardKeyOutcome").addEventListener("keyup", function (event) {
+			// Create a new div element
+			var itemElement = document.createElement("div");
+
+			// Set the name attribute of the div element to the key value
+			itemElement.setAttribute("name", event.key);
+
+			// Set the innerHTML of the div element to the key value
+			itemElement.innerHTML = event.key;
+
+			// Append the div element to the KeyboardKeysList element
+			document.querySelector("#KeyboardKeysList").appendChild(itemElement);
+
+			// Prevent the default keyup behavior
+			event.preventDefault();
+
+			// Return false to prevent further propagation of the event
+			return false;
+		}, false);
+
+		// Confirms the number of clicks until an alert is shown.
+		function confirmAlertsCount() {
+			// Get the number of iterations from the input field
+			var iterations = parseInt(document.getElementById('NumberOfClicks').value);
+
+			// Get the button element for tracking clicks until alert
+			var button = document.getElementById('UntilAlert');
+
+			// Get the current value of the button (number of clicks so far)
+			var value = parseInt(button.getAttribute('value'));
+
+			// Get the element displaying the current number of clicks
+			var thisValue = document.getElementById('CurrentNumberOfClicks');
+
+			// If the number of clicks so far is equal to or exceeds the desired number of iterations, show an alert and return
+			if (value >= iterations) {
+				alert('Testing Alert!');
+				return;
+			}
+
+			// Increment the value of the button and update the button's attribute
+			button.setAttribute('value', (value + 1).toString());
+
+			// Update the display of the current number of clicks
+			thisValue.setAttribute('value', (value + 1).toString());
+		}
+
+		// Confirms the number of attribute clicks.
+		function confirmAttribute() {
+			// Get the number of iterations from the input field
+			var iterations = parseInt(document.getElementById('NumberOfAttributeClicks').value);
+
+			// Get the button element for tracking clicks
+			var button = document.getElementById('UntilAttribute');
+
+			// Get the current value of the button (number of clicks so far)
+			var value = parseInt(button.getAttribute('value'));
+
+			// Get the element displaying the current value of the attribute
+			var thisValue = document.getElementById('AttributeValue');
+
+			// If the number of clicks so far is equal to or exceeds the desired number of iterations, return
+			if (value >= iterations) {
+				return;
+			}
+
+			// Increment the value of the button and update the button's attribute
+			button.setAttribute('value', (value + 1).toString());
+
+			// Update the display of the current value
+			thisValue.setAttribute('value', (value + 1).toString());
+
+			// Set a custom attribute with the updated value
+			thisValue.setAttribute('custom-attribute', (value + 1).toString());
+		}
+
+		// Confirms if a button is disabled after a certain number of clicks.
+		function confirmDisabled() {
+			// Get the button element to track clicks
+			var button = document.getElementById('UntilDisabled');
+
+			// Get the number of iterations from the button's value attribute
+			var iterations = parseInt(button.value);
+
+			// Get the current number of clicks from the custom attribute 'numbderOfClicks'
+			var numberOfClicks = parseInt(button.getAttribute('numbderOfClicks'));
+
+			// Increment the number of clicks
+			numberOfClicks++;
+
+			// Update the custom attribute with the new number of clicks
+			button.setAttribute('numbderOfClicks', numberOfClicks);
+
+			// If the current number of clicks is less than the desired iterations, return
+			if (iterations > numberOfClicks) {
+				return;
+			}
+
+			// Disable the button after reaching the desired number of clicks
+			button.disabled = true;
+
+			// Set focus to the button for accessibility
+			button.focus();
+		}
+
+		// Sets the number of alerts to be popped based on the user input.
+		function setAlertCount() {
+			// Get the number of iterations from the input field
+			var iterations = parseInt(document.getElementById('NumberOfAlerts').value);
+
+			// Get the button element for popping alerts
+			var button = document.getElementById('PopAlert');
+
+			// Get the current value of the button (number of alerts popped so far)
+			var value = parseInt(button.getAttribute('value'));
+
+			// Get the element displaying the current number of alerts
+			var currentValue = document.getElementById('CurrentNumberOfAlerts');
+
+			// If the number of alerts popped so far is equal to or exceeds the desired number of iterations, return
+			if (value >= iterations) {
+				return;
+			}
+
+			// Increment the value of the button and update the button's attribute
+			button.setAttribute('value', (value + 1).toString());
+
+			// Update the display of the current number of alerts
+			currentValue.setAttribute('value', (value + 1).toString());
+
+			// Pop an alert for testing purposes
+			alert('Testing Alert!');
+		}
+
+		// Sets the scroll values of the page in input fields.
+		function setPageScrollValues() {
+			// Get the body element of the document
+			var bodyElement = document.querySelector("body");
+
+			// Set the scroll left value to the input field with id 'ScrollOutcomeX'
+			document.querySelector("#ScrollOutcomeX").setAttribute('value', bodyElement.scrollLeft);
+
+			// Set the scroll top value to the input field with id 'ScrollOutcomeY'
+			document.querySelector("#ScrollOutcomeY").setAttribute('value', bodyElement.scrollTop);
+		}
+	</script>
+</body>
+</html>

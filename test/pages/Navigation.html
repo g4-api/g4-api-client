@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navigation Test Page with Query Parameters</title>
+</head>
+<body>
+
+    <header>
+        <h1>Navigation Test Page with Query Parameters</h1>
+    </header>
+
+    <nav>
+        <a href="#section1">Go to Section 1</a> |
+        <a href="#section2">Go to Section 2</a> |
+        <a href="#section3">Go to Section 3</a>
+    </nav>
+
+    <section id="section1">
+        <h2>Section 1</h2>
+        <p>This is the content of Section 1. You can navigate to other sections using the links above.</p>
+    </section>
+
+    <section id="section2">
+        <h2>Section 2</h2>
+        <p>This is the content of Section 2. You can navigate to other sections using the links above.</p>
+    </section>
+
+    <section id="section3">
+        <h2>Section 3</h2>
+        <p>This is the content of Section 3. You can navigate to other sections using the links above.</p>
+    </section>
+
+    <div>
+        <button onclick="navigateToQueryParam('param1=value1')">Add Query Param 1</button>
+        <button onclick="navigateToQueryParam('param2=value2')">Add Query Param 2</button>
+        <button onclick="navigateToQueryParam('param3=value3')">Add Query Param 3</button>
+        <button onclick="manualRefreshPage()">Manual Refresh Page</button>
+    </div>
+
+    <div id="queryParamsDisplay">
+        <h3>Current Query Parameters:</h3>
+        <p id="queryParamsText">None</p>
+        <p id="refreshIndicator" style="color:red;"></p>
+    </div>
+
+    <footer>
+        <p>Footer Content - Navigation Test Page</p>
+    </footer>
+
+    <script>
+        function navigateToQueryParam(param) {
+            const url = new URL(window.location.href);
+            url.searchParams.set(param.split('=')[0], param.split('=')[1]);
+            window.history.pushState({ path: url.href }, '', url.href);
+            displayCurrentParams();
+        }
+
+        function manualRefreshPage() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('refreshed', 'true');
+            window.history.replaceState({ path: url.href }, '', url.href);
+            window.location.reload();
+        }
+
+        function detectRefresh() {
+            const url = new URL(window.location.href);
+            const navigationType = performance.getEntriesByType("navigation")[0].type;
+
+            if (navigationType === 'reload') {
+                url.searchParams.set('refreshed', 'true');
+                window.history.replaceState({ path: url.href }, '', url.href);
+            }
+        }
+
+        function displayCurrentParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentParams = Array.from(urlParams.entries()).map(entry => entry.join('=')).join(', ');
+            document.getElementById('queryParamsText').textContent = currentParams || 'None';
+
+            if (urlParams.has('refreshed') && urlParams.get('refreshed') === 'true') {
+                document.getElementById('refreshIndicator').textContent = 'Page was refreshed!';
+            } else {
+                document.getElementById('refreshIndicator').textContent = '';
+            }
+        }
+
+        window.onpopstate = function (event) {
+            displayCurrentParams();
+        };
+
+        // Detect refresh on page load
+        detectRefresh();
+
+        // Initial display of query parameters on page load
+        displayCurrentParams();
+    </script>
+
+</body>
+</html>
