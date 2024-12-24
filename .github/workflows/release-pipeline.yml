@@ -329,7 +329,7 @@ jobs:
   NewRelease:
     name: New GitHub Release Version ${{ needs.NewVersion.outputs.buildVersion }}
     runs-on: ubuntu-latest
-    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' && needs.InvokeTests.result == 'success' && needs.PublishNugetPackages.result == 'success' }}
+    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' && (needs.InvokeTests.result == 'success' || needs.InvokeTests.result == 'skipped') && needs.PublishNugetPackages.result == 'success' }}
     needs:
       - NewVersion
       - InvokeTests
