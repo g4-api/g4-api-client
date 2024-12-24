@@ -1,6 +1,5 @@
 # G4.Api
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![NuGet](https://img.shields.io/nuget/v/g4.api?logo=nuget&label=NuGet)](https://www.nuget.org/packages/g4.Api)
 [![Build, Test & Release](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml/badge.svg)](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml)  
   
