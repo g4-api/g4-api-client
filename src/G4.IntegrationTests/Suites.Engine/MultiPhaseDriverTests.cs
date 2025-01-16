@@ -1,6 +1,4 @@
-﻿using G4.Api;
-using G4.Attributes;
-using G4.Extensions;
+﻿using G4.Extensions;
 using G4.IntegrationTests.Engine;
 using G4.IntegrationTests.Extensions;
 using G4.IntegrationTests.Framework;
@@ -46,8 +44,9 @@ namespace G4.IntegrationTests.Suites.Engine
             var sessions = driverSessions.Concat([automationDriverSession]).Distinct().ToArray();
 
             // Assert that exactly two unique driver sessions were created
-            Assert.IsTrue(
-                condition: sessions.Length == 2,
+            Assert.AreEqual(
+                expected: 2,
+                actual: sessions.Length,
                 message: "Expected two distinct WebDriver sessions to be initiated.");
 
             // Assert that none of the plugins within the job are using the automation driver
@@ -93,16 +92,16 @@ namespace G4.IntegrationTests.Suites.Engine
             var sessions = driverSessions.Concat([automationDriverSession]).Distinct().ToArray();
 
             // Assert that exactly two unique driver sessions were created
-            Assert.IsTrue(
-                condition: sessions.Length == 2,
-                message: "Expected two distinct WebDriver sessions to be initiated."
-            );
+            Assert.AreEqual(
+                expected: 2,
+                actual: sessions.Length,
+                message: "Expected two distinct WebDriver sessions to be initiated.");
 
             // Assert that the environment's session parameters count is exactly two
-            Assert.IsTrue(
-                condition: response.Environment.SessionParameters.Count == 2,
-                message: "Expected exactly two session parameters to be present."
-            );
+            Assert.AreEqual(
+                expected: 2,
+                actual: response.Environment.SessionParameters.Count,
+                message: "Expected exactly two session parameters to be present.");
 
             // Assert that all session parameters have the expected decoded value "Foo Bar"
             Assert.IsTrue(
