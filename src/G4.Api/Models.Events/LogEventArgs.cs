@@ -10,12 +10,7 @@ namespace G4.Models.Events
         /// <summary>
         /// Gets or sets the automation identifier associated with the log event.
         /// </summary>
-        public string Automation { get; set; }
-
-        /// <summary>
-        /// Gets or sets the automation group associated with the log event.
-        /// </summary>
-        public string AutomationGroup { get; set; }
+        public G4AutomationModel Automation { get; set; }
 
         /// <summary>
         /// Gets or sets the invoker of the log event.

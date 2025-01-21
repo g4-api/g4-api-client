@@ -295,8 +295,7 @@ namespace G4.Api.Clients
                     // Safely invoke the event handler if it's not null
                     client.LogCreated?.Invoke(sender, e: new LogEventArgs
                     {
-                        Automation = automation.Reference?.Id,
-                        AutomationGroup = automation.Reference?.GroupId,
+                        Automation = automation,
                         Invoker = invoker.Reference,
                         LogMessage = args
                     });
@@ -318,8 +317,7 @@ namespace G4.Api.Clients
                     // Safely invoke the event handler if it's not null
                     client.LogCreating?.Invoke(sender, e: new LogEventArgs
                     {
-                        Automation = automation.Reference?.Id,
-                        AutomationGroup = automation.GroupId,
+                        Automation = automation,
                         Invoker = invoker.Reference,
                         LogMessage = args
                     });
