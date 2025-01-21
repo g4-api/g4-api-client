@@ -1,5 +1,6 @@
 ﻿using G4.Api.Models;
 using G4.Models;
+using G4.Models.Events;
 using G4.Plugins;
 
 using Microsoft.Extensions.Logging;
@@ -58,12 +59,12 @@ namespace G4.Api.Abstractions
         /// <summary>
         /// Occurs after a log entry has been created.
         /// </summary>
-        event EventHandler<IDictionary<string, object>> LogCreated;
+        event EventHandler<LogEventArgs> LogCreated;
 
         /// <summary>
         /// Occurs before a log entry is created.
         /// </summary>
-        event EventHandler<IDictionary<string, object>> LogCreating;
+        event EventHandler<LogEventArgs> LogCreating;
 
         /// <summary>
         /// Occurs when an error occurs during action execution.

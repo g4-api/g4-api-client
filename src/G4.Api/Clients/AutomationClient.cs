@@ -4,6 +4,7 @@ using G4.Api.Models;
 using G4.Cache;
 using G4.Extensions;
 using G4.Models;
+using G4.Models.Events;
 using G4.Plugins;
 using G4.Plugins.Engine;
 
@@ -50,10 +51,10 @@ namespace G4.Api.Clients
         public event EventHandler<JobEventArgs> JobStatusChanged;
 
         /// <inheritdoc />
-        public event EventHandler<IDictionary<string, object>> LogCreated;
+        public event EventHandler<LogEventArgs> LogCreated;
 
         /// <inheritdoc />
-        public event EventHandler<IDictionary<string, object>> LogCreating;
+        public event EventHandler<LogEventArgs> LogCreating;
 
         /// <inheritdoc />
         public event EventHandler<(RuleEventArgs EventArguments, Exception Exception)> OnRuleError;
@@ -229,7 +230,7 @@ namespace G4.Api.Clients
                 // Set up new invoker events using the client and the newly created queue model
                 if (registerStatusEvents)
                 {
-                    RegisterInvokerEvents(client, invoker);
+                    RegisterInvokerEvents(client, automation, invoker);
                 }
 
                 // Invoke the AutomationRequestInitialized event on the client
@@ -244,7 +245,7 @@ namespace G4.Api.Clients
         }
 
         // Registers event handlers for the invoker by wrapping the client's event handlers with exception handling and logging.
-        private static void RegisterInvokerEvents(AutomationClient client, AutomationInvoker invoker)
+        private static void RegisterInvokerEvents(AutomationClient client, G4AutomationModel automation, AutomationInvoker invoker)
         {
             // Creates a new delegate that wraps an event handler with exception handling and logging.
             static EventHandler<T> NewDelegate<T>(AutomationClient client, EventHandler<T> eventHandler)
@@ -255,7 +256,7 @@ namespace G4.Api.Clients
                     try
                     {
                         // Safely invoke the event handler if it's not null
-                        eventHandler?.Invoke(sender, args);
+                        eventHandler?.Invoke(sender, e: args);
                     }
                     catch (Exception e)
                     {
@@ -287,8 +288,51 @@ namespace G4.Api.Clients
             invoker.StageInvoking += NewDelegate(client, client.StageInvoking);
             invoker.StageStatusChanged += NewDelegate(client, client.StageStatusChanged);
 
-            logger.LogCreated += NewDelegate(client, client.LogCreated);
-            logger.LogCreating += NewDelegate(client, client.LogCreating);
+            logger.LogCreated += (sender, args) =>
+            {
+                try
+                {
+                    // Safely invoke the event handler if it's not null
+                    client.LogCreated?.Invoke(sender, e: new LogEventArgs
+                    {
+                        Automation = automation.Reference?.Id,
+                        AutomationGroup = automation.Reference?.GroupId,
+                        Invoker = invoker.Reference,
+                        LogMessage = args
+                    });
+                }
+                catch (Exception e)
+                {
+                    // Log the error if an exception occurs during event invocation
+                    client.Logger.LogError(
+                        exception: e,
+                        message: "Error in event handler. Sender: {Sender}, EventArgs: {EventArgs}",
+                        sender?.GetType().FullName, typeof(object).Name);
+                }
+            };
+
+            logger.LogCreating += (sender, args) =>
+            {
+                try
+                {
+                    // Safely invoke the event handler if it's not null
+                    client.LogCreating?.Invoke(sender, e: new LogEventArgs
+                    {
+                        Automation = automation.Reference?.Id,
+                        AutomationGroup = automation.GroupId,
+                        Invoker = invoker.Reference,
+                        LogMessage = args
+                    });
+                }
+                catch (Exception e)
+                {
+                    // Log the error if an exception occurs during event invocation
+                    client.Logger.LogError(
+                        exception: e,
+                        message: "Error in event handler. Sender: {Sender}, EventArgs: {EventArgs}",
+                        sender?.GetType().FullName, typeof(object).Name);
+                }
+            };
         }
         #endregion
     }
