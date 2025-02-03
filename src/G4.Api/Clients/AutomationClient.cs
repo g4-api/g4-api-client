@@ -215,7 +215,7 @@ namespace G4.Api.Clients
                 var status = automation.NewQueueModel(properties: dataProvider);
 
                 // Initialize the automation using the cache manager
-                status.Automation.Initialize(CacheManager.Instance);
+                status.Automation.Initialize(CacheManager.Instance, dataProvider);
 
                 // Set the iteration number for the automation
                 status.Automation.Iteration = i;

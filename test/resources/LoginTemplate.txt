@@ -1,0 +1,105 @@
+{
+    "aliases": [
+        "ConnectDemoApp"
+    ],
+    "author": {
+        "link": "https://www.linkedin.com/in/roei-sabag-247aa18/",
+        "name": "Roei Sabag"
+    },
+    "categories": [
+        "UserInterface",
+        "Authentication"
+    ],
+    "source": "Template",
+    "description": [
+        "### Purpose",
+        "",
+        "The `Login` plugin is designed to automate the process of logging into a web application by interacting with the necessary username and password fields and clicking the login button.",
+        "",
+        "### Key Features and Functionality",
+        "",
+        "| Feature                 | Description                                                                                            |",
+        "|-------------------------|--------------------------------------------------------------------------------------------------------|",
+        "| Dynamic Field Detection | Automatically locates the username, password fields, and login button based on provided locators.      |",
+        "| Secure Input Handling   | Ensures secure handling of sensitive data like passwords during automation workflows.                  |",
+        "| Error Handling          | Incorporates error handling to manage exceptions, such as incorrect login details or missing elements. |",
+        "",
+        "### Usages in RPA",
+        "",
+        "| Usage                | Description                                                                                                     |",
+        "|----------------------|-----------------------------------------------------------------------------------------------------------------|",
+        "| Web Login Automation | Automates the login process by filling in the username and password fields and clicking the login button.       |",
+        "| Form Submission      | Automates the submission of login forms in web applications.                                                    |",
+        "| Error Handling       | Detects and handles scenarios where the login process fails, such as incorrect credentials or missing elements. |"
+    ],
+    "examples": [
+        {
+            "description": [
+                "Perform a login action by sending the username and password to the respective input fields and clicking the login button."
+            ],
+            "rule": {
+                "$type": "Action",
+                "pluginName": "Login",
+                "argument": "{{$ --Username:Foo --Password:bar}}"
+            }
+        }
+    ],
+    "key": "Login",
+    "manifestVersion": 4,
+    "parameters": [
+        {
+            "description": [
+                "Specifies the username that should be entered into the username input field during the login process."
+            ],
+            "mandatory": true,
+            "name": "Username",
+            "type": "String"
+        },
+        {
+            "description": [
+                "Specifies the password that should be entered into the password input field during the login process."
+            ],
+            "mandatory": true,
+            "name": "Password",
+            "type": "String"
+        }
+    ],
+    "pluginType": "Action",
+    "properties": [
+        {
+            "description": [
+                "Specifies the credentials used for logging in. The argument accepts both the username and password in the format '@Username' and '@Password'."
+            ],
+            "mandatory": true,
+            "name": "Argument",
+            "type": "String|Expression"
+        }
+    ],
+    "rules": [
+        {
+            "$type": "Action",
+            "locator": "CssSelector",
+            "onElement": "#positive",
+            "pluginName": "SendKeys",
+            "argument": "{{$ parameters.Username }}"
+        },
+        {
+            "$type": "Action",
+            "onElement": "//positive",
+            "pluginName": "SendKeys",
+            "argument": "{{$ parameters.Password }}"
+        },
+        {
+            "$type": "Action",
+            "onElement": "//positive",
+            "pluginName": "Click"
+        }
+    ],
+    "scopes": [
+        "Web",
+        "MobileWeb"
+    ],
+    "summary": [
+        "The `Login` plugin automates the process of logging into a web application by filling in username and password fields and clicking the login button."
+    ]
+}

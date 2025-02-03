@@ -1,4 +1,5 @@
 ﻿using G4.Api;
+using G4.Attributes;
 using G4.Extensions;
 using G4.Models;
 using G4.Plugins.Ui.Actions;
@@ -9,6 +10,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -21,6 +23,39 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class G4ClientTests : TestBase
     {
+        [TestMethod("Verify that parameters are correctly applied in the template rules")]
+        public void TemplateTest()
+        {
+            // Read the JSON template file and remove any extra whitespace
+            var json = File.ReadAllText("Resources/LoginTemplate.txt").Trim();
+
+            // Deserialize the JSON into a G4PluginAttribute object using your predefined JsonOptions
+            var manifest = JsonSerializer.Deserialize<G4PluginAttribute>(json, JsonOptions);
+
+            // Instantiate a new G4Client which manages your templates
+            var client = new G4Client();
+
+            // Retrieve the current templates; expecting no templates initially
+            var templates = client.Templates.GetTemplates();
+            Assert.AreEqual(0, templates.Count(), "Expected no templates before adding a new one.");
+
+            // Add a new template based on the manifest loaded from the JSON file
+            client.Templates.AddTemplate(manifest);
+
+            // Retrieve the templates again after adding the new template; expecting one template now
+            templates = client.Templates.GetTemplates();
+            Assert.AreEqual(1, templates.Count(), "Expected one template after adding a new one.");
+
+            // Construct the JSON string for an action rule, including the $type field and the plugin parameters
+            var ruleJson = "{" +
+                "\"$type\":\"Action\"," +
+                "\"pluginName\":\"" + manifest.Key + "\"," +
+                "\"argument\":\"{{$ --Username:Foo --Password:Bar}}\"}";
+
+            // Invoke the action rule (this method processes the rule JSON as needed)
+            Invoke(ruleJson);
+        }
+
         [TestMethod(displayName: "Verify the data provider when data is provided")]
         public void DataProviderWithDataTest()
         {
@@ -883,9 +918,6 @@ namespace G4.UnitTests.Engine
                     // Assert that the job's performance point is not null
                     Assert.IsNotNull(value: job.PerformancePoint, message: "Job performance point must not be null.");
 
-                    // Assert that the job's plugins count is greater than zero
-                    //Assert.IsTrue(condition: job.Plugins.Any(), message: "The job's plugins count should be greater than zero");
-
                     // Assert that the job's stage reference is not null
                     Assert.IsNotNull(value: job.StageReference, message: "Job stage reference must not be null.");
                 }
@@ -1208,14 +1240,14 @@ namespace G4.UnitTests.Engine
             // Rule for sending keys to the username input field.
             new ActionRuleModel
             {
-                Argument = "{{@Name}}",
+                Argument = "{{$ columns.Name }}",
                 OnElement = "//positive[@id='{{$New-Date}}']",
                 PluginName = "SendKeys"
             },
             // Rule for sending keys to the password input field.
             new ActionRuleModel
             {
-                Argument = "{{@Id}}",
+                Argument = "{{$ columns.Id }}",
                 OnElement = "//input[@id='none']",
                 PluginName = "SendKeys"
             },
