@@ -404,9 +404,7 @@ namespace G4.IntegrationTests.Framework
             var testParameters = environment.TestParameters;
 
             // Determine the path to the driver binaries based on the execution context.
-            var binariesPath = $"{properties["Integration.Local"]}".Equals("true", StringComparison.OrdinalIgnoreCase)
-                ? $"{properties["Grid.Endpoint"]}"
-                : $"{properties["Grid.Endpoint"]}";
+            var binariesPath = $"{properties["Grid.Endpoint"]}";
 
             // Get the desired driver capabilities for the automation.
             var capabilities = NewCapabilities(environment);
@@ -414,8 +412,7 @@ namespace G4.IntegrationTests.Framework
             // Create a CapabilitiesModel to encapsulate the driver capabilities.
             var capabilitiesModel = new CapabilitiesModel
             {
-                AlwaysMatch = capabilities,
-                FirstMatch = [new Dictionary<string, object>()]
+                AlwaysMatch = capabilities
             };
 
             // Build and return a dictionary of driver parameters.
@@ -424,7 +421,8 @@ namespace G4.IntegrationTests.Framework
             {
                 ["driver"] = $"{driver}",
                 ["driverBinaries"] = binariesPath,
-                ["capabilities"] = capabilitiesModel
+                ["capabilities"] = capabilitiesModel,
+                ["firstMatch"] = Enumerable.Empty<Dictionary<string, object>>()
             };
         }
 
