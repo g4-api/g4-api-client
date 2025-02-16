@@ -15,11 +15,6 @@ namespace G4.Api
     /// <param name="logger">The logger instance for logging.</param>
     public class G4Client(CacheManager cache, IQueueManager queueManager, ILogger logger)
     {
-        #region *** Fields       ***
-        // Manages the queue operations for handling automation processes.
-        private readonly IQueueManager _queueManager = queueManager;
-        #endregion
-
         #region *** Constructors ***
         /// <summary>
         /// Initializes a new instance of the <see cref="G4Client"/> class with default LiteDatabase, cache, queue manager, and logger.
@@ -85,6 +80,11 @@ namespace G4.Api
         /// Gets the automation client responsible for managing and invoking automations within the G4 system.
         /// </summary>
         public IAutomationClient Automation { get; } = new AutomationClient(logger);
+
+        /// <summary>
+        /// Gets the automation client responsible for managing and invoking automations asynchronously within the G4 system.
+        /// </summary>
+        public IAutomationAsyncClient AutomationAsync { get; } = new AutomationAsyncClient(logger, queueManager);
 
         /// <summary>
         /// Gets the environments client responsible for managing different environments within the G4 system.
