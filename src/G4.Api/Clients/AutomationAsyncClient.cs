@@ -1,5 +1,147 @@
-﻿namespace G4.Api.Clients
+﻿using G4.Api.Abstractions;
+using G4.Cache;
+using G4.Extensions;
+using G4.Models;
+using G4.Plugins.Engine;
+
+using Microsoft.Extensions.Logging;
+
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace G4.Api.Clients
 {
+    /// <summary>
+    /// Represents a client responsible for managing and invoking automations within the G4 system.
+    /// </summary>
+    /// <param name="logger">The logger instance for logging.</param>
+    internal class AutomationAsyncClient(ILogger logger, IQueueManager queueManager) : ClientBase, IAutomationAsyncClient
+    {
+        public AutomationAsyncClient(ILogger logger)
+            : this(logger, queueManager: new BasicQueueManager())
+        { }
+
+        public IQueueManager QueueManager => queueManager;
+
+        public ILogger Logger => logger;
+
+        public void AddAutomation(G4AutomationModel automation)
+        {
+            // Generate new automations based on the provided automation model
+            var automations = automation.NewAutomations().ToArray();
+
+            // Iterate over each automation in the collection
+            var queueModels = NewAutomationRequests(automations).ToArray();
+
+            QueueManager.AddPending(queueModels);
+        }
+
+        public AutomationQueueModel GetAutomation()
+        {
+            var queueModel = QueueManager.GetPending();
+            var id = queueModel.Status.Automation.Reference.Id;
+            var groupId = queueModel.Status.Automation.GroupId;
+
+            if(!QueueManager.Active.ContainsKey(groupId))
+            {
+                QueueManager.Active[groupId] = [];
+            }
+
+            QueueManager.Active[groupId][id] = queueModel;
+            return queueModel;
+        }
+
+        // Creates a list of new automation queue models based on the provided client and automations.
+        private static ConcurrentBag<AutomationQueueModel> NewAutomationRequests(
+            IEnumerable<(G4AutomationModel Automation, IDictionary<string, object> DataProvider)> automations)
+        {
+            // Initialize a list to store the resulting automation queue models
+            var queueModels = new ConcurrentBag<AutomationQueueModel>();
+
+            // Process each automation and its corresponding data provider
+            for (int i = 0; i < automations.Count(); i++)
+            {
+                // Deconstruct the tuple into separate variables for the automation and data provider
+                var (automation, dataProvider) = automations.ElementAt(i);
+
+                // Create a new queue model from the automation model and data provider
+                var status = automation.NewQueueModel(properties: dataProvider);
+
+                // Initialize the automation using the cache manager
+                status.Automation.Initialize(CacheManager.Instance, dataProvider);
+
+                // Set the iteration number for the automation
+                status.Automation.Iteration = i;
+                status.Automation.Reference.Iteration = i;
+                status.ProgressStatus.GroupId = status.Automation.GroupId;
+                status.ProgressStatus.Description = status.Automation.Reference.Description;
+
+                // Create a new automation invoker based on the queue model's automation
+                var invoker = new AutomationInvoker(status.Automation);
+
+                // Create a new automation queue model with the invoker and status
+                var queueModel = new AutomationQueueModel(invoker, status);
+
+                // Add the queue model to the list of results
+                queueModels.Add(queueModel);
+            }
+
+            // Return the list of new automation queue models
+            return queueModels;
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     //internal class AutomationAsyncClient(IQueueManager queueManager, ILogger logger) : ClientBase(), IAutomationClient
     //{
     //    // Queue manager for handling automation queues
