@@ -27,14 +27,33 @@ namespace G4.Api.Clients
 
         public ILogger Logger => logger;
 
-        public void AddAutomation(G4AutomationModel automation)
+        public void AddActiveAutomation(AutomationQueueModel queueModel)
         {
-            // Generate new automations based on the provided automation model
+            var statusId = queueModel.Status.ProgressStatus.Id;
+            var automation = queueModel.Status.Automation;
+            var statusGroupId = queueModel.Status.ProgressStatus.GroupId;
+            var groupId = string.IsNullOrEmpty(statusGroupId) ? automation.GroupId : statusGroupId;
+            var id = string.IsNullOrEmpty(statusId) ? automation.Reference.Id : statusId;
+
+            if (!QueueManager.Active.TryGetValue(groupId, out ConcurrentDictionary<string, AutomationQueueModel> group))
+            {
+                group = ([]);
+                QueueManager.Active[groupId] = group;
+            }
+
+            group[id] = queueModel;
+        }
+
+        /// <inheritdoc />
+        public void AddPendingAutomation(G4AutomationModel automation)
+        {
+            // Generate a collection of new automation instances from the provided automation model.
             var automations = automation.NewAutomations().ToArray();
 
-            // Iterate over each automation in the collection
+            // Create queue models for each automation instance.
             var queueModels = NewAutomationRequests(automations).ToArray();
 
+            // Enqueue the generated automation queue models for further processing.
             QueueManager.AddPending(queueModels);
         }
 
@@ -53,42 +72,47 @@ namespace G4.Api.Clients
             return queueModel;
         }
 
-        // Creates a list of new automation queue models based on the provided client and automations.
+        // Creates new automation queue models based on the provided automation models and data providers.
         private static ConcurrentBag<AutomationQueueModel> NewAutomationRequests(
             IEnumerable<(G4AutomationModel Automation, IDictionary<string, object> DataProvider)> automations)
         {
-            // Initialize a list to store the resulting automation queue models
+            // Create a thread-safe collection to store the resulting automation queue models.
             var queueModels = new ConcurrentBag<AutomationQueueModel>();
 
-            // Process each automation and its corresponding data provider
+            // Iterate over each automation and its corresponding data provider.
             for (int i = 0; i < automations.Count(); i++)
             {
-                // Deconstruct the tuple into separate variables for the automation and data provider
+                // Deconstruct the tuple into the automation and data provider.
                 var (automation, dataProvider) = automations.ElementAt(i);
 
-                // Create a new queue model from the automation model and data provider
+                // Create a new queue model status using the automation model and provided properties.
                 var status = automation.NewQueueModel(properties: dataProvider);
 
-                // Initialize the automation using the cache manager
+                // Initialize the automation with the cache manager and data provider.
                 status.Automation.Initialize(CacheManager.Instance, dataProvider);
 
-                // Set the iteration number for the automation
+                // Set the iteration number for both the automation and its reference.
                 status.Automation.Iteration = i;
                 status.Automation.Reference.Iteration = i;
+
+                // Update the progress status with details from the automation.
                 status.ProgressStatus.GroupId = status.Automation.GroupId;
                 status.ProgressStatus.Description = status.Automation.Reference.Description;
+                status.ProgressStatus.Iteration = i;
+                status.ProgressStatus.Name = status.Automation.Reference.Name;
+                status.ProgressStatus.Id = $"{status.Automation.Reference.Id}";
 
-                // Create a new automation invoker based on the queue model's automation
+                // Create a new automation invoker based on the updated automation.
                 var invoker = new AutomationInvoker(status.Automation);
 
-                // Create a new automation queue model with the invoker and status
+                // Instantiate a new automation queue model using the invoker and status.
                 var queueModel = new AutomationQueueModel(invoker, status);
 
-                // Add the queue model to the list of results
+                // Add the newly created queue model to the thread-safe collection.
                 queueModels.Add(queueModel);
             }
 
-            // Return the list of new automation queue models
+            // Return the collection of automation queue models.
             return queueModels;
         }
     }

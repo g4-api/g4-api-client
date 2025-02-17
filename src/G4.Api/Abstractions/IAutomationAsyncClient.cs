@@ -130,7 +130,18 @@ namespace G4.Api.Abstractions
         ///// A dictionary where the keys are group IDs and the values are automation response models.
         ///// </returns>
         //IDictionary<string, G4AutomationResponseModel> Invoke(G4AutomationModel automation);
-        void AddAutomation(G4AutomationModel automation);
+
+        void AddActiveAutomation(AutomationQueueModel queueModel);
+
+        /// <summary>
+        /// Adds a new automation by generating a set of automation requests from the provided automation model,
+        /// creating corresponding queue models, and enqueuing them as pending tasks.
+        /// </summary>
+        /// <param name="automation">
+        /// The <see cref="G4AutomationModel"/> instance representing the automation configuration from which
+        /// individual automation requests will be derived.
+        /// </param>
+        void AddPendingAutomation(G4AutomationModel automation);
 
         AutomationQueueModel GetAutomation();
         #endregion

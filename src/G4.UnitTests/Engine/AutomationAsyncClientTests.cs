@@ -4,32 +4,56 @@ using G4.UnitTests.Framework;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace G4.UnitTests.Engine
 {
     [TestClass]
+    [TestCategory("Engine")]
+    [TestCategory("G4Client")]
+    [TestCategory("UnitTest")]
     public class AutomationAsyncClientTests : TestBase
     {
-        [TestMethod]
-        public void Test()
+        [TestMethod(displayName: "Verify that a single automation is enqueued when no data is used")]
+        public void QueueNewAutomationTest()
         {
+            // Instantiate a new G4Client and retrieve its asynchronous automation client
             var client = new G4Client();
             var asyncClient = client.AutomationAsync;
 
+            // Create an automation model with 1 stage and without data using the test context
             var automation = NewAutomation(TestContext, numberOfStages: 1, useData: false);
 
-            asyncClient.AddAutomation(automation);
+            // Retrieve the current pending automations from the async client's queue manager
+            var pendingQueue = asyncClient.QueueManager.Pending;
 
-            var q = asyncClient.QueueManager;
+            // Add the new automation to the pending queue
+            asyncClient.AddPendingAutomation(automation);
 
-            asyncClient.GetAutomation();
-            var a = "";
+            // Assert that exactly one automation has been added to the pending queue
+            Assert.AreEqual(expected: 1, actual: pendingQueue.Count);
+        }
+
+        [TestMethod(displayName: "Verify that multiple automations are enqueued when data is provided")]
+        public void QueueNewAutomationWithDataTest()
+        {
+            // Instantiate a new G4Client and retrieve its asynchronous automation client
+            var client = new G4Client();
+            var asyncClient = client.AutomationAsync;
+
+            // Create an automation model with data using the test context
+            var automation = NewAutomation(TestContext);
+
+            // Retrieve the current pending automations from the async client's queue manager
+            var pendingQueue = asyncClient.QueueManager.Pending;
+
+            // Add the new automation to the pending queue
+            asyncClient.AddPendingAutomation(automation);
+
+            // Assert that exactly three automations (expected based on the provided data) are in the pending queue
+            Assert.AreEqual(expected: 3, actual: pendingQueue.Count);
         }
 
         // Creates a new automation model with the provided testContext.
