@@ -131,6 +131,10 @@ namespace G4.Api.Abstractions
         ///// </returns>
         //IDictionary<string, G4AutomationResponseModel> Invoke(G4AutomationModel automation);
 
+        /// <summary>
+        /// Adds an automation queue model to the active queue, organizing it under the appropriate group.
+        /// </summary>
+        /// <param name="queueModel">The <see cref="AutomationQueueModel"/> instance representing the automation to be marked as active.</param>
         void AddActiveAutomation(AutomationQueueModel queueModel);
 
         /// <summary>
@@ -143,7 +147,11 @@ namespace G4.Api.Abstractions
         /// </param>
         void AddPendingAutomation(G4AutomationModel automation);
 
-        AutomationQueueModel GetAutomation();
+        /// <summary>
+        /// Retrieves the next pending automation queue model.
+        /// </summary>
+        /// <returns>The next <see cref="AutomationQueueModel"/> from the pending queue.</returns>
+        AutomationQueueModel GetPendingAutomation();
         #endregion
     }
 }

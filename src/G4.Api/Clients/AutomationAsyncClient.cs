@@ -27,20 +27,39 @@ namespace G4.Api.Clients
 
         public ILogger Logger => logger;
 
+        /// <inheritdoc />
         public void AddActiveAutomation(AutomationQueueModel queueModel)
         {
+            // Extract the progress status identifier from the queue model.
             var statusId = queueModel.Status.ProgressStatus.Id;
+
+            // Extract the automation instance from the queue model.
             var automation = queueModel.Status.Automation;
+
+            // Extract the progress status group identifier from the queue model.
             var statusGroupId = queueModel.Status.ProgressStatus.GroupId;
+
+            // Determine the effective group identifier: use the progress status group if available
+            // otherwise, use the automation's group.
             var groupId = string.IsNullOrEmpty(statusGroupId) ? automation.GroupId : statusGroupId;
+
+            // Determine the effective automation identifier: use the progress status ID if available
+            // otherwise, use the automation reference's ID.
             var id = string.IsNullOrEmpty(statusId) ? automation.Reference.Id : statusId;
 
+            // Attempt to retrieve the active automation group from the queue manager.
             if (!QueueManager.Active.TryGetValue(groupId, out ConcurrentDictionary<string, AutomationQueueModel> group))
             {
-                group = ([]);
+                // If the group doesn't exist, create a new thread-safe dictionary for it.
+                group = [];
                 QueueManager.Active[groupId] = group;
             }
 
+            // Set the status of the queue model to "Processing".
+            queueModel.Status.ProgressStatus.Status = G4QueueModel.QueueStatusCodes.Processing;
+
+            // Add or update the automation queue model in the active group
+            // using the determined automation identifier.
             group[id] = queueModel;
         }
 
@@ -57,20 +76,8 @@ namespace G4.Api.Clients
             QueueManager.AddPending(queueModels);
         }
 
-        public AutomationQueueModel GetAutomation()
-        {
-            var queueModel = QueueManager.GetPending();
-            var id = queueModel.Status.Automation.Reference.Id;
-            var groupId = queueModel.Status.Automation.GroupId;
-
-            if(!QueueManager.Active.ContainsKey(groupId))
-            {
-                QueueManager.Active[groupId] = [];
-            }
-
-            QueueManager.Active[groupId][id] = queueModel;
-            return queueModel;
-        }
+        /// <inheritdoc />
+        public AutomationQueueModel GetPendingAutomation() => QueueManager.GetPending();
 
         // Creates new automation queue models based on the provided automation models and data providers.
         private static ConcurrentBag<AutomationQueueModel> NewAutomationRequests(

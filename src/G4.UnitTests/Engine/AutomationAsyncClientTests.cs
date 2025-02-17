@@ -56,6 +56,53 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(expected: 3, actual: pendingQueue.Count);
         }
 
+        [TestMethod(displayName: "Verify that pending automation is accepted and moved to active " +
+            "queue when automation is queued")]
+        public void QueueNewActiveAutomationTest()
+        {
+            // Instantiate a new G4Client and retrieve its asynchronous automation client.
+            var client = new G4Client();
+            var asyncClient = client.AutomationAsync;
+
+            // Create an automation model with test context data.
+            var automation = NewAutomation(TestContext);
+
+            // Retrieve the pending and active automation queues from the async client's queue manager.
+            var pendingQueue = asyncClient.QueueManager.Pending;
+            var activeQueue = asyncClient.QueueManager.Active;
+
+            // Add the new automation to the pending queue.
+            asyncClient.AddPendingAutomation(automation);
+
+            // Assert that exactly three automations are in the pending queue.
+            Assert.AreEqual(expected: 3, actual: pendingQueue.Count);
+
+            // Retrieve the next pending automation.
+            var pendingAutomation = asyncClient.GetPendingAutomation();
+
+            // Assert that the pending queue count decreases to two after retrieving one automation.
+            Assert.AreEqual(expected: 2, actual: pendingQueue.Count);
+
+            // Verify that the status of the retrieved pending automation is 'Accepted'.
+            Assert.AreEqual(
+                expected: G4QueueModel.QueueStatusCodes.New,
+                actual: pendingAutomation.Status.ProgressStatus.Status);
+
+            // Move the pending automation to the active queue.
+            asyncClient.AddActiveAutomation(pendingAutomation);
+
+            // Retrieve the first active automation from the active queue.
+            var firstActiveAutomation = activeQueue.First().Value.First().Value;
+
+            // Assert that there is exactly one group in the active queue.
+            Assert.AreEqual(expected: 1, actual: activeQueue.Count);
+
+            // Verify that the status of the active automation is 'Processing'.
+            Assert.AreEqual(
+                expected: G4QueueModel.QueueStatusCodes.Processing,
+                actual: firstActiveAutomation.Status.ProgressStatus.Status);
+        }
+
         // Creates a new automation model with the provided testContext.
         private static G4AutomationModel NewAutomation(TestContext testContext)
         {
