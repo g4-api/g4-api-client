@@ -14,7 +14,7 @@ namespace G4.Api
     public class BasicQueueManager : IQueueManager
     {
         // A flag indicating whether the queue manager is paused.
-        private bool _paused = false;
+        private bool _paused;
 
         #region *** Events           ***
         /// <inheritdoc />
