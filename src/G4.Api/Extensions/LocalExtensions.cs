@@ -22,6 +22,47 @@ namespace G4.Extensions
             new DateTimeIso8601Converter());
 
         /// <summary>
+        /// Adds or updates a <see cref="G4QueueModel"/> in the concurrent queue based on its group and identifier.
+        /// </summary>
+        /// <param name="queue">
+        /// A concurrent dictionary where the key is the group identifier and the value is another concurrent dictionary
+        /// mapping automation identifiers to <see cref="G4QueueModel"/> instances.
+        /// </param>
+        /// <param name="queueModel">The queue model to add or update.</param>
+        public static void Add(this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue, G4QueueModel queueModel)
+        {
+            // Extract the progress status identifier from the queue model.
+            var statusId = queueModel.ProgressStatus.Id;
+
+            // Extract the automation instance from the queue model.
+            var automation = queueModel.Automation;
+
+            // Extract the progress status group identifier from the queue model.
+            var statusGroupId = queueModel.ProgressStatus.GroupId;
+
+            // Determine the effective group identifier: if the progress status group is not provided,
+            // fall back to the automation's group identifier.
+            var groupId = string.IsNullOrEmpty(statusGroupId) ? automation.GroupId : statusGroupId;
+
+            // Determine the effective automation identifier: if the progress status ID is not provided,
+            // fall back to the automation reference's ID.
+            var id = string.IsNullOrEmpty(statusId) ? automation.Reference.Id : statusId;
+
+            // Retrieve the active group from the queue. If it doesn't exist, create a new concurrent dictionary for the group.
+            if (!queue.TryGetValue(groupId, out ConcurrentDictionary<string, G4QueueModel> group))
+            {
+                group = [];
+                queue[groupId] = group;
+            }
+
+            // Set the status of the queue model to "Processing".
+            queueModel.ProgressStatus.Status = G4QueueModel.QueueStatusCodes.Processing;
+
+            // Add or update the queue model in the group using the determined automation identifier.
+            group[id] = queueModel;
+        }
+
+        /// <summary>
         /// Marks a specific job within the automation queue as complete and updates the corresponding stage and queue statuses.
         /// </summary>
         /// <param name="queueModel">The automation queue model containing the current status of all stages and jobs.</param>
@@ -476,6 +517,79 @@ namespace G4.Extensions
         /// <exception cref="NotImplementedException">Thrown when the data provider type is not implemented.</exception>
         public static DataTable NewDataTable(this G4DataProviderModel dataProvider)
         {
+            // Creates a DataTable from JSON data based on a data provider model.
+            static DataTable NewFromJson(G4DataProviderModel dataProvider)
+            {
+                // Selects rows from a DataTable based on a filter expression.
+                static DataTable SelectRows(DataTable dataTable, string filterExpression)
+                {
+                    // Check if the filter expression is empty
+                    // If the filter expression is empty, return the original DataTable
+                    if (filterExpression.Length == 0)
+                    {
+                        return dataTable;
+                    }
+
+                    // Select rows based on the filter expression
+                    var rows = dataTable.Select(filterExpression);
+
+                    // Create a new DataTable with the same structure as the original DataTable
+                    var copiedDataTable = dataTable.Clone();
+
+                    // Import selected rows into the new DataTable
+                    foreach (DataRow row in rows)
+                    {
+                        copiedDataTable.ImportRow(row);
+                    }
+
+                    // Return the new DataTable containing the selected rows
+                    return copiedDataTable;
+                }
+
+                // Check if the JSON data source is empty
+                // If the JSON data source is empty, return an empty DataTable
+                if (string.IsNullOrEmpty(dataProvider.Source))
+                {
+                    return new DataTable();
+                }
+
+                // Create a new DataTable to hold the JSON data
+                var dataTable = new DataTable();
+
+                // Ensure that the filter expression is not null
+                dataProvider.Filter = (string.IsNullOrEmpty(dataProvider.Filter)) ? string.Empty : dataProvider.Filter;
+
+                // Check if the JSON data source exists as a file
+                // If the JSON data source exists as a file, read its contents
+                if (System.IO.File.Exists(dataProvider.Source))
+                {
+                    dataProvider.Source = System.IO.File.ReadAllText(dataProvider.Source);
+                }
+
+                // Parse the JSON data into a JToken
+                var token = Newtonsoft.Json.Linq.JToken.Parse(dataProvider.Source);
+
+                // Check if the JSON data is an array
+                // If the JSON data is not an array, return an empty DataTable
+                if (token is not Newtonsoft.Json.Linq.JArray)
+                {
+                    return dataTable;
+                }
+
+                // Check if the JSON array is empty
+                // If the JSON array is empty, return an empty DataTable
+                if (((Newtonsoft.Json.Linq.JArray)token).Count == 0)
+                {
+                    return dataTable;
+                }
+
+                // Deserialize the JSON data into a DataTable
+                dataTable = Newtonsoft.Json.JsonConvert.DeserializeObject<DataTable>(dataProvider.Source);
+
+                // Select rows from the DataTable based on the filter expression
+                return SelectRows(dataTable, filterExpression: dataProvider.Filter);
+            }
+
             // Determine the data provider type and call the appropriate method
             return dataProvider.Type.ToUpper() switch
             {
@@ -575,77 +689,140 @@ namespace G4.Extensions
             };
         }
 
-        // Creates a DataTable from JSON data based on a data provider model.
-        private static DataTable NewFromJson(G4DataProviderModel dataProvider)
+        /// <summary>
+        /// Creates a new queue model based on the provided automation model, status, and properties.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>
+        /// <param name="queueModel">The dequeued <see cref="G4QueueModel"/> if successful; otherwise, null.</param>
+        /// <returns><c>true</c> if a <see cref="G4QueueModel"/> was successfully dequeued; otherwise, <c>false</c>.</returns>
+        public static bool TryDequeue(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue,
+            out G4QueueModel queueModel)
         {
-            // Selects rows from a DataTable based on a filter expression.
-            static DataTable SelectRows(DataTable dataTable, string filterExpression)
+            // Initialize the output parameter to null.
+            queueModel = null;
+
+            // Use LINQ to get the first group (outer dictionary key-value pair) that has a non-empty inner dictionary.
+            var group = queue.FirstOrDefault(i => !i.Value.IsEmpty);
+
+            // Check if a non-empty group was found.
+            if (group.Equals(default(KeyValuePair<string, ConcurrentDictionary<string, G4QueueModel>>)))
             {
-                // Check if the filter expression is empty
-                // If the filter expression is empty, return the original DataTable
-                if (filterExpression.Length == 0)
+                return false;
+            }
+
+            // Use LINQ to get the first item (inner dictionary key-value pair) from the found group.
+            var item = group.Value.FirstOrDefault();
+
+            // Check if an item exists in the selected inner dictionary.
+            if (item.Equals(default(KeyValuePair<string, G4QueueModel>)))
+            {
+                return false;
+            }
+
+            // Attempt to remove the selected item from the inner dictionary in a thread-safe manner.
+            if (group.Value.TryRemove(item.Key, out queueModel))
+            {
+                // If the inner dictionary is now empty after removal, remove the entire group from the outer dictionary.
+                if (group.Value.IsEmpty)
                 {
-                    return dataTable;
+                    queue.TryRemove(group.Key, out _);
                 }
 
-                // Select rows based on the filter expression
-                var rows = dataTable.Select(filterExpression);
+                // Return true if the removal of the item was successful.
+                return true;
+            }
 
-                // Create a new DataTable with the same structure as the original DataTable
-                var copiedDataTable = dataTable.Clone();
+            // Return false if the removal of the item was not successful.
+            return false;
+        }
 
-                // Import selected rows into the new DataTable
-                foreach (DataRow row in rows)
+        /// <summary>
+        /// Creates a new queue model based on the provided automation model, status, and properties.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group to dequeue from.</param>
+        /// <param name="queueModel">The dequeued <see cref="G4QueueModel"/> if successful; otherwise, null.</param>
+        /// <returns><c>true</c> if a <see cref="G4QueueModel"/> was successfully dequeued; otherwise, <c>false</c>.</returns>
+        public static bool TryDequeue(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue,
+            string group,
+            out G4QueueModel queueModel)
+        {
+
+            // Initialize the output parameter.
+            queueModel = null;
+
+            // Check if the specified group exists and is non-empty.
+            if (!queue.TryGetValue(group, out var innerQueue) || innerQueue.IsEmpty)
+            {
+                return false;
+            }
+
+            // Use LINQ to obtain the first item from the inner dictionary.
+            var item = innerQueue.FirstOrDefault();
+
+            // If no valid item is found, return false.
+            if (item.Equals(default(KeyValuePair<string, G4QueueModel>)))
+            {
+                return false;
+            }
+
+            // Attempt to remove the selected item from the inner dictionary.
+            if (innerQueue.TryRemove(item.Key, out queueModel))
+            {
+                // If the inner dictionary is empty after removal, remove the group from the outer dictionary.
+                if (innerQueue.IsEmpty)
                 {
-                    copiedDataTable.ImportRow(row);
+                    queue.TryRemove(group, out _);
                 }
 
-                // Return the new DataTable containing the selected rows
-                return copiedDataTable;
+                // Return true if the removal was successful.
+                return true;
             }
 
-            // Check if the JSON data source is empty
-            // If the JSON data source is empty, return an empty DataTable
-            if (string.IsNullOrEmpty(dataProvider.Source))
+            // Return false if the removal was not successful.
+            return false;
+        }
+
+        /// <summary>
+        /// Creates a new queue model based on the provided automation model, status, and properties.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group to dequeue from.</param>
+        /// <param name="id">The identifier of the item to be dequeued.</param>
+        /// <param name="queueModel">The dequeued <see cref="G4QueueModel"/> if successful; otherwise, null.</param>
+        /// <returns><c>true</c> if a <see cref="G4QueueModel"/> was successfully dequeued; otherwise, <c>false</c>.</returns>
+        public static bool TryDequeue(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue,
+            string group,
+            string id,
+            out G4QueueModel queueModel)
+        {
+            // Initialize the output parameter.
+            queueModel = null;
+
+            // Check if the specified group exists.
+            if (!queue.TryGetValue(group, out var innerQueue))
             {
-                return new DataTable();
+                return false;
             }
 
-            // Create a new DataTable to hold the JSON data
-            var dataTable = new DataTable();
-
-            // Ensure that the filter expression is not null
-            dataProvider.Filter = (string.IsNullOrEmpty(dataProvider.Filter)) ? string.Empty : dataProvider.Filter;
-
-            // Check if the JSON data source exists as a file
-            // If the JSON data source exists as a file, read its contents
-            if (System.IO.File.Exists(dataProvider.Source))
+            // Attempt to remove the item with the specified id from the inner dictionary.
+            if (innerQueue.TryRemove(id, out queueModel))
             {
-                dataProvider.Source = System.IO.File.ReadAllText(dataProvider.Source);
+                // If the inner dictionary becomes empty after removal, remove the group from the outer dictionary.
+                if (innerQueue.IsEmpty)
+                {
+                    queue.TryRemove(group, out _);
+                }
+
+                // Return true if the item was successfully removed.
+                return true;
             }
 
-            // Parse the JSON data into a JToken
-            var token = Newtonsoft.Json.Linq.JToken.Parse(dataProvider.Source);
-
-            // Check if the JSON data is an array
-            // If the JSON data is not an array, return an empty DataTable
-            if (token is not Newtonsoft.Json.Linq.JArray)
-            {
-                return dataTable;
-            }
-
-            // Check if the JSON array is empty
-            // If the JSON array is empty, return an empty DataTable
-            if (((Newtonsoft.Json.Linq.JArray)token).Count == 0)
-            {
-                return dataTable;
-            }
-
-            // Deserialize the JSON data into a DataTable
-            dataTable = Newtonsoft.Json.JsonConvert.DeserializeObject<DataTable>(dataProvider.Source);
-
-            // Select rows from the DataTable based on the filter expression
-            return SelectRows(dataTable, filterExpression: dataProvider.Filter);
+            // Return false if the specified item could not be removed.
+            return false;
         }
 
         /// <summary>
@@ -674,6 +851,69 @@ namespace G4.Extensions
 
             // Return the group ID and the updated response model as a tuple
             return (queueModel.Status.Automation.GroupId, response);
+        }
+
+        /// <summary>
+        /// Attempts to update the <see cref="G4QueueModel"/> with the specified identifier in the given group using the provided update function.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group.</param>
+        /// <param name="id">The identifier of the item to update.</param>
+        /// <param name="updateFactory">A function that receives the current <see cref="G4QueueModel"/> and returns its updated version.</param>
+        /// <returns><c>true</c> if the item was successfully updated; otherwise, <c>false</c>.</returns>
+        public static bool Update(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue,
+            string group,
+            string id,
+            Func<G4QueueModel, G4QueueModel> updateFactory)
+        {
+            // Check if the specified group exists.
+            if (!queue.TryGetValue(group, out var innerQueue))
+            {
+                return false;
+            }
+
+            // Retrieve the current model for the given identifier.
+            if (!innerQueue.TryGetValue(id, out var currentModel))
+            {
+                return false;
+            }
+
+            // Compute the updated model using the provided update function.
+            var updatedModel = updateFactory(currentModel);
+
+            // Atomically update the item in the inner dictionary.
+            return innerQueue.TryUpdate(id, updatedModel, currentModel);
+        }
+
+        /// <summary>
+        /// Attempts to update the <see cref="G4QueueModel"/> with the specified identifier in the given group
+        /// by replacing it with the provided new model.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group.</param><param name="id">The identifier of the item to update.</param>
+        /// <param name="newModel">The new <see cref="G4QueueModel"/> instance to replace the current one.</param>
+        /// <returns><c>true</c> if the item was successfully updated; otherwise, <c>false</c>.</returns>
+        public static bool Update(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue,
+            string group,
+            string id,
+            G4QueueModel newModel)
+        {
+            // Check if the specified group exists.
+            if (!queue.TryGetValue(group, out var innerQueue))
+            {
+                return false;
+            }
+
+            // Retrieve the current model for the given identifier.
+            if (!innerQueue.TryGetValue(id, out var currentModel))
+            {
+                return false;
+            }
+
+            // Atomically update the item in the inner dictionary by replacing it with the new model.
+            return innerQueue.TryUpdate(id, newModel, currentModel);
         }
 
         /// <summary>
