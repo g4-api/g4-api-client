@@ -854,6 +854,36 @@ namespace G4.Extensions
         }
 
         /// <summary>
+        /// Updates the queue with the specified <see cref="G4QueueModel"/> by using its embedded group and id information.
+        /// </summary>
+        /// <param name="queue">The concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>
+        /// <param name="newModel">The new <see cref="G4QueueModel"/> instance that should replace the existing one in the queue.</param>
+        /// <returns><c>true</c> if the update was successful; otherwise, <c>false</c>.</returns>
+        public static bool Update(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> queue,
+            G4QueueModel newModel)
+        {
+            // Check if the new model contains a valid group identifier.
+            var isGroup = !string.IsNullOrEmpty(newModel?.Automation?.GroupId);
+
+            // Check if the new model contains a valid id within its reference.
+            var isId = !string.IsNullOrEmpty(newModel?.Automation?.Reference?.Id);
+
+            // If either the group or the id is invalid, return false indicating failure.
+            if (!isGroup || !isId)
+            {
+                return false;
+            }
+
+            // Call the overload that accepts group and id, passing the new model.
+            return Update(
+                queue,
+                group: newModel.Automation.GroupId,
+                id: newModel.Automation.Reference.Id,
+                newModel);
+        }
+
+        /// <summary>
         /// Attempts to update the <see cref="G4QueueModel"/> with the specified identifier in the given group using the provided update function.
         /// </summary>
         /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="G4QueueModel"/> items.</param>

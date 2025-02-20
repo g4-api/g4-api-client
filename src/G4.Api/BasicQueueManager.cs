@@ -1,4 +1,5 @@
 ﻿using G4.Attributes;
+using G4.Extensions;
 using G4.Models;
 
 using System;
@@ -16,65 +17,60 @@ namespace G4.Api
         // A flag indicating whether the queue manager is paused.
         private bool _paused;
 
-        #region *** Events           ***
+        #region *** Events     ***
         /// <inheritdoc />
-        public event EventHandler<AutomationQueueModel> ModelDequeued;
+        public event EventHandler<G4QueueModel> ModelDequeued;
 
         /// <inheritdoc />
-        public event EventHandler<AutomationQueueModel> ModelEnqueued;
+        public event EventHandler<QueueManagerEventArgs> ModelDequeuing;
 
         /// <inheritdoc />
-        public event EventHandler<AutomationQueueModel> ModelEnqueuing;
+        public event EventHandler<G4QueueModel> ModelEnqueued;
+
+        /// <inheritdoc />
+        public event EventHandler<G4QueueModel> ModelEnqueuing;
 
         /// <inheritdoc />
         public event EventHandler<QueueManagerEventArgs> OnError;
         #endregion
 
-        #region *** Properties       ***
+        #region *** Properties ***
         /// <inheritdoc />
-        public ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> Active { get; } = new();
+        public ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> Active { get; } = [];
 
         /// <inheritdoc />
-        public ConcurrentQueue<AutomationQueueModel> Pending { get; } = new();
+        public ConcurrentQueue<G4QueueModel> Pending { get; } = [];
 
         /// <inheritdoc />
         public ConcurrentBag<G4QueueModel> Errors { get; } = [];
         #endregion
 
-        #region *** Methods: Enqueue ***
+        #region *** Methods    ***
         /// <inheritdoc />
         public void AddActive(params G4QueueModel[] queueModels)
         {
-            foreach (G4QueueModel queueModel in queueModels)
+            // Check if the queue manager is paused.
+            if (_paused)
             {
-                //// Set the status of the queueModel to "Active".
-                //queueModel.ProgressStatus.StatusCode = G4QueueModel.QueueStatusCodes.Accepted;
+                return;
+            }
 
-                //// Create an instance of QueueManagerEventArgs to provide additional information for events.
-                //var eventArgs = new QueueManagerEventArgs
-                //{
-                //    Collection = Active,
-                //    CollectionType = nameof(G4QueueModel.QueueStatusCodes.Accepted),
-                //    QueueModel = queueModel
-                //};
-
-                //// Raise the ModelEnqueuing event with the pre-addition information.
-                //ModelEnqueuing?.Invoke(this, eventArgs);
-
-                //// Add the queue model to the active queue.
-                //Active.Enqueue(queueModel);
-
-                //// Update the eventArgs with the added queue model.
-                //eventArgs.QueueModel = queueModel;
-
-                //// Raise the ModelEnqueued event with the post-addition information.
-                //ModelEnqueued?.Invoke(this, eventArgs);
+            // Iterate through each automation queue model in the collection.
+            foreach (var queueModel in queueModels)
+            {
+                Active.Add(queueModel);
             }
         }
 
         /// <inheritdoc />
         public void AddError(G4QueueModel queueModel)
         {
+            // Check if the queue manager is paused.
+            if (_paused)
+            {
+                return;
+            }
+
             // Update the status of the queueModel to indicate an error.
             queueModel.ProgressStatus.Status = G4QueueModel.QueueStatusCodes.Error;
 
@@ -83,8 +79,15 @@ namespace G4.Api
         }
 
         /// <inheritdoc />
-        public void AddPending(params AutomationQueueModel[] queueModels)
+        public void AddPending(params G4QueueModel[] queueModels)
         {
+            // Check if the queue manager is paused.
+            if (_paused)
+            {
+                return;
+            }
+
+            // Iterate through each automation queue model in the collection.
             foreach (var queueModel in queueModels)
             {
                 // Raise the ModelEnqueuing event with the pre-addition information.
@@ -97,52 +100,18 @@ namespace G4.Api
                 ModelEnqueued?.Invoke(this, queueModel);
             }
         }
-        #endregion
 
-        #region *** Methods: Dequeue ***
-        /// <summary>
-        /// Dequeues an automation queue model from the active queue.
-        /// </summary>
-        /// <returns>The dequeued automation queue model, or <c>null</c> if the dequeue operation fails.</returns>
+        /// <inheritdoc />
         public G4QueueModel GetActive()
         {
-            //// Create an instance of QueueManagerEventArgs to provide additional information for events.
-            //var eventArgs = new QueueManagerEventArgs
-            //{
-            //    Collection = Active,
-            //    CollectionType = nameof(G4QueueModel.QueueStatusCodes.Accepted)
-            //};
+            // Try to dequeue an item from the active collection.
+            Active.TryDequeue(out var queueModel);
 
-            //// Raise the ModelDequeuing event with the pre-dequeue information.
-            //ModelDequeuing?.Invoke(this, eventArgs);
-
-            //// Attempt to dequeue an automation queue model from the active queue.
-            //var isDequeue = Active.TryDequeue(out var queueModel);
-
-            //// If the dequeue operation fails, raise an error event and return null.
-            //if (!isDequeue)
-            //{
-            //    NewError(this, queueModel);
-            //    return null;
-            //}
-
-            //// Update the eventArgs with the dequeued queue model.
-            //eventArgs.QueueModel = queueModel;
-            //eventArgs.Collection = Active;
-
-            //// Raise the ModelDequeued event with the post-dequeue information.
-            //ModelDequeued?.Invoke(this, eventArgs);
-
-            //// Return the dequeued automation queue model.
-            //return queueModel;
-
-            return default;
+            // Return the dequeued automation queue model.
+            return queueModel;
         }
 
-        /// <summary>
-        /// Gets all automation queue models in the errors collection.
-        /// </summary>
-        /// <returns>An IEnumerable of automation queue models in the errors collection.</returns>
+        /// <inheritdoc />
         public IEnumerable<G4QueueModel> GetErrors()
         {
             // The errors collection is a concurrent bag, and it doesn't require dequeuing or dequeue events.
@@ -150,11 +119,8 @@ namespace G4.Api
             return Errors;
         }
 
-        /// <summary>
-        /// Dequeues an automation queue model from the pending collection.
-        /// </summary>
-        /// <returns>The dequeued automation queue model or null if the collection is empty.</returns>
-        public AutomationQueueModel GetPending()
+        /// <inheritdoc />
+        public G4QueueModel GetPending()
         {
             // Try to dequeue an item from the pending collection.
             var isDequeue = Pending.TryDequeue(out var queueModel);
@@ -162,7 +128,7 @@ namespace G4.Api
             // If dequeueing fails, log an error and return null.
             if (!isDequeue)
             {
-                NewError(this, queueModel.Status);
+                NewError(this, queueModel);
                 return null;
             }
 
@@ -172,9 +138,7 @@ namespace G4.Api
             // Return the dequeued automation queue model.
             return queueModel;
         }
-        #endregion
 
-        #region *** Methods          ***
         /// <inheritdoc />
         public void Pause()
         {
@@ -217,6 +181,32 @@ namespace G4.Api
                 // Set the paused flag to false, indicating the queue manager is resumed.
                 _paused = false;
             }
+        }
+
+        /// <inheritdoc />
+        public void UpdateActive(G4QueueModel queueModel)
+        {
+            // Check if the queue manager is paused.
+            if (_paused)
+            {
+                return;
+            }
+
+            // Update the active queue model.
+            Active.Update(queueModel);
+        }
+
+        /// <inheritdoc />
+        public void UpdateActive(string group, string id, G4QueueModel queueModel)
+        {
+            // Check if the queue manager is paused.
+            if (_paused)
+            {
+                return;
+            }
+
+            // Update the active queue model.
+            Active.Update(group, id, queueModel);
         }
         #endregion
 

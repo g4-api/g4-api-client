@@ -1,4 +1,5 @@
-﻿using G4.Models;
+﻿using G4.Extensions;
+using G4.Models;
 
 using System;
 using System.Collections.Concurrent;
@@ -15,17 +16,22 @@ namespace G4.Api
         /// <summary>
         /// Event raised when a model is dequeued.
         /// </summary>
-        event EventHandler<AutomationQueueModel> ModelDequeued;
+        event EventHandler<G4QueueModel> ModelDequeued;
+
+        /// <summary>
+        /// Event raised right before a model is dequeued.
+        /// </summary>
+        event EventHandler<QueueManagerEventArgs> ModelDequeuing;
 
         /// <summary>
         /// Event raised when a model is enqueued.
         /// </summary>
-        event EventHandler<AutomationQueueModel> ModelEnqueued;
+        event EventHandler<G4QueueModel> ModelEnqueued;
 
         /// <summary>
         /// Event raised when a model is enqueuing.
         /// </summary>
-        event EventHandler<AutomationQueueModel> ModelEnqueuing;
+        event EventHandler<G4QueueModel> ModelEnqueuing;
 
         /// <summary>
         /// Event raised on an error.
@@ -37,12 +43,12 @@ namespace G4.Api
         /// <summary>
         /// Gets the concurrent queue of active automation queue models.
         /// </summary>
-        ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> Active { get; }
+        ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> Active { get; }
 
         /// <summary>
         /// Gets the concurrent queue of pending automation queue models.
         /// </summary>
-        ConcurrentQueue<AutomationQueueModel> Pending { get; }
+        ConcurrentQueue<G4QueueModel> Pending { get; }
 
         /// <summary>
         /// Gets the concurrent bag of automation queue models with errors.
@@ -67,7 +73,7 @@ namespace G4.Api
         /// Adds an automation queue model to the pending queue.
         /// </summary>
         /// <param name="queueModels">The automation queue models to add to the pending collection.</param>
-        void AddPending(params AutomationQueueModel[] queueModels);
+        void AddPending(params G4QueueModel[] queueModels);
 
         /// <summary>
         /// Gets the next automation queue model from the active queue.
@@ -85,7 +91,7 @@ namespace G4.Api
         /// Gets the next automation queue model from the pending queue.
         /// </summary>
         /// <returns>The next automation queue model from the pending queue.</returns>
-        AutomationQueueModel GetPending();
+        G4QueueModel GetPending();
 
         /// <summary>
         /// Pauses the queue manager, preventing further processing of automation queue models.
@@ -101,6 +107,20 @@ namespace G4.Api
         /// Resumes the queue manager, allowing the processing of automation queue models to continue.
         /// </summary>
         void Resume();
+
+        /// <summary>
+        /// Updates the active queue model with the provided <see cref="G4QueueModel"/>.
+        /// </summary>
+        /// <param name="queueModel">The new <see cref="G4QueueModel"/> to update the active queue with.</param>
+        void UpdateActive(G4QueueModel queueModel);
+
+        /// <summary>
+        /// Updates the active queue model for the specified group and identifier with the provided <see cref="G4QueueModel"/>.
+        /// </summary>
+        /// <param name="group">The group identifier for the queue model.</param>
+        /// <param name="id">The unique identifier of the queue model.</param>
+        /// <param name="queueModel">The new <see cref="G4QueueModel"/> to update the active queue with.</param>
+        void UpdateActive(string group, string id, G4QueueModel queueModel);
         #endregion
     }
 }
