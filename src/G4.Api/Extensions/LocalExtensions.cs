@@ -63,6 +63,47 @@ namespace G4.Extensions
         }
 
         /// <summary>
+        /// Adds or updates a <see cref="AutomationQueueModel"/> in the concurrent queue based on its group and identifier.
+        /// </summary>
+        /// <param name="queue">
+        /// A concurrent dictionary where the key is the group identifier and the value is another concurrent dictionary
+        /// mapping automation identifiers to <see cref="AutomationQueueModel"/> instances.
+        /// </param>
+        /// <param name="queueModel">The queue model to add or update.</param>
+        public static void Add(this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue, AutomationQueueModel queueModel)
+        {
+            // Extract the progress status identifier from the queue model.
+            var statusId = queueModel.Status.ProgressStatus.Id;
+
+            // Extract the automation instance from the queue model.
+            var automation = queueModel.Status.Automation;
+
+            // Extract the progress status group identifier from the queue model.
+            var statusGroupId = queueModel.Status.ProgressStatus.GroupId;
+
+            // Determine the effective group identifier: if the progress status group is not provided,
+            // fall back to the automation's group identifier.
+            var groupId = string.IsNullOrEmpty(statusGroupId) ? automation.GroupId : statusGroupId;
+
+            // Determine the effective automation identifier: if the progress status ID is not provided,
+            // fall back to the automation reference's ID.
+            var id = string.IsNullOrEmpty(statusId) ? automation.Reference.Id : statusId;
+
+            // Retrieve the active group from the queue. If it doesn't exist, create a new concurrent dictionary for the group.
+            if (!queue.TryGetValue(groupId, out ConcurrentDictionary<string, AutomationQueueModel> group))
+            {
+                group = [];
+                queue[groupId] = group;
+            }
+
+            // Set the status of the queue model to "Processing".
+            queueModel.Status.ProgressStatus.Status = G4QueueModel.QueueStatusCodes.Processing;
+
+            // Add or update the queue model in the group using the determined automation identifier.
+            group[id] = queueModel;
+        }
+
+        /// <summary>
         /// Marks a specific job within the automation queue as complete and updates the corresponding stage and queue statuses.
         /// </summary>
         /// <param name="queueModel">The automation queue model containing the current status of all stages and jobs.</param>
@@ -263,6 +304,23 @@ namespace G4.Extensions
             {
                 ConfirmRule(rule, includes);
             }
+        }
+
+        /// <summary>
+        /// Retrieves the maximum degree of parallelism from the automation model's settings,
+        /// ensuring that it is at least 1.
+        /// </summary>
+        /// <param name="automation">The automation model containing the automation settings.</param>
+        /// <returns>The maximum degree of parallelism specified in the automation settings, or 1 if the value is less than 1.</returns>
+        public static int GetMaxParallel(this G4AutomationModel automation)
+        {
+            // Retrieve the automation settings from the provided automation model.
+            var automationSettings = automation.Settings.AutomationSettings;
+
+            // Ensure that the maximum parallel value is at least 1.
+            return automationSettings.MaxParallel < 1
+                ? 1
+                : automationSettings.MaxParallel;
         }
 
         /// <summary>
@@ -749,7 +807,6 @@ namespace G4.Extensions
             string group,
             out G4QueueModel queueModel)
         {
-
             // Initialize the output parameter.
             queueModel = null;
 
@@ -798,6 +855,141 @@ namespace G4.Extensions
             string group,
             string id,
             out G4QueueModel queueModel)
+        {
+            // Initialize the output parameter.
+            queueModel = null;
+
+            // Check if the specified group exists.
+            if (!queue.TryGetValue(group, out var innerQueue))
+            {
+                return false;
+            }
+
+            // Attempt to remove the item with the specified id from the inner dictionary.
+            if (innerQueue.TryRemove(id, out queueModel))
+            {
+                // If the inner dictionary becomes empty after removal, remove the group from the outer dictionary.
+                if (innerQueue.IsEmpty)
+                {
+                    queue.TryRemove(group, out _);
+                }
+
+                // Return true if the item was successfully removed.
+                return true;
+            }
+
+            // Return false if the specified item could not be removed.
+            return false;
+        }
+
+        /// <summary>
+        /// Creates a new queue model based on the provided automation model, status, and properties.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="AutomationQueueModel"/> items.</param>
+        /// <param name="queueModel">The dequeued <see cref="AutomationQueueModel"/> if successful; otherwise, null.</param>
+        /// <returns><c>true</c> if a <see cref="AutomationQueueModel"/> was successfully dequeued; otherwise, <c>false</c>.</returns>
+        public static bool TryDequeue(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue,
+            out AutomationQueueModel queueModel)
+        {
+            // Initialize the output parameter to null.
+            queueModel = null;
+
+            // Use LINQ to get the first group (outer dictionary key-value pair) that has a non-empty inner dictionary.
+            var group = queue.FirstOrDefault(i => !i.Value.IsEmpty);
+
+            // Check if a non-empty group was found.
+            if (group.Equals(default(KeyValuePair<string, ConcurrentDictionary<string, AutomationQueueModel>>)))
+            {
+                return false;
+            }
+
+            // Use LINQ to get the first item (inner dictionary key-value pair) from the found group.
+            var item = group.Value.FirstOrDefault();
+
+            // Check if an item exists in the selected inner dictionary.
+            if (item.Equals(default(KeyValuePair<string, AutomationQueueModel>)))
+            {
+                return false;
+            }
+
+            // Attempt to remove the selected item from the inner dictionary in a thread-safe manner.
+            if (group.Value.TryRemove(item.Key, out queueModel))
+            {
+                // If the inner dictionary is now empty after removal, remove the entire group from the outer dictionary.
+                if (group.Value.IsEmpty)
+                {
+                    queue.TryRemove(group.Key, out _);
+                }
+
+                // Return true if the removal of the item was successful.
+                return true;
+            }
+
+            // Return false if the removal of the item was not successful.
+            return false;
+        }
+
+        /// <summary>
+        /// Creates a new queue model based on the provided automation model, status, and properties.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="AutomationQueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group to dequeue from.</param>
+        /// <param name="queueModel">The dequeued <see cref="AutomationQueueModel"/> if successful; otherwise, null.</param>
+        /// <returns><c>true</c> if a <see cref="AutomationQueueModel"/> was successfully dequeued; otherwise, <c>false</c>.</returns>
+        public static bool TryDequeue(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue,
+            string group,
+            out AutomationQueueModel queueModel)
+        {
+            // Initialize the output parameter.
+            queueModel = null;
+
+            // Check if the specified group exists and is non-empty.
+            if (!queue.TryGetValue(group, out var innerQueue) || innerQueue.IsEmpty)
+            {
+                return false;
+            }
+
+            // Use LINQ to obtain the first item from the inner dictionary.
+            var item = innerQueue.FirstOrDefault();
+
+            // If no valid item is found, return false.
+            if (item.Equals(default(KeyValuePair<string, AutomationQueueModel>)))
+            {
+                return false;
+            }
+
+            // Attempt to remove the selected item from the inner dictionary.
+            if (innerQueue.TryRemove(item.Key, out queueModel))
+            {
+                // If the inner dictionary is empty after removal, remove the group from the outer dictionary.
+                if (innerQueue.IsEmpty)
+                {
+                    queue.TryRemove(group, out _);
+                }
+
+                // Return true if the removal was successful.
+                return true;
+            }
+
+            // Return false if the removal was not successful.
+            return false;
+        }
+
+        /// <summary>
+        /// Creates a new queue model based on the provided automation model, status, and properties.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="AutomationQueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group to dequeue from.</param>
+        /// <param name="id">The identifier of the item to be dequeued.</param>
+        /// <param name="queueModel">The dequeued <see cref="AutomationQueueModel"/> if successful; otherwise, null.</param>
+        /// <returns><c>true</c> if a <see cref="AutomationQueueModel"/> was successfully dequeued; otherwise, <c>false</c>.</returns>
+        public static bool TryDequeue(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue,
+            string group,
+            string id,
+            out AutomationQueueModel queueModel)
         {
             // Initialize the output parameter.
             queueModel = null;
@@ -929,6 +1121,99 @@ namespace G4.Extensions
             string group,
             string id,
             G4QueueModel newModel)
+        {
+            // Check if the specified group exists.
+            if (!queue.TryGetValue(group, out var innerQueue))
+            {
+                return false;
+            }
+
+            // Retrieve the current model for the given identifier.
+            if (!innerQueue.TryGetValue(id, out var currentModel))
+            {
+                return false;
+            }
+
+            // Atomically update the item in the inner dictionary by replacing it with the new model.
+            return innerQueue.TryUpdate(id, newModel, currentModel);
+        }
+
+        /// <summary>
+        /// Updates the queue with the specified <see cref="AutomationQueueModel"/> by using its embedded group and id information.
+        /// </summary>
+        /// <param name="queue">The concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="AutomationQueueModel"/> items.</param>
+        /// <param name="newModel">The new <see cref="AutomationQueueModel"/> instance that should replace the existing one in the queue.</param>
+        /// <returns><c>true</c> if the update was successful; otherwise, <c>false</c>.</returns>
+        public static bool Update(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue,
+            AutomationQueueModel newModel)
+        {
+            // Check if the new model contains a valid group identifier.
+            var isGroup = !string.IsNullOrEmpty(newModel?.Status?.Automation?.GroupId);
+
+            // Check if the new model contains a valid id within its reference.
+            var isId = !string.IsNullOrEmpty(newModel?.Status?.Automation?.Reference?.Id);
+
+            // If either the group or the id is invalid, return false indicating failure.
+            if (!isGroup || !isId)
+            {
+                return false;
+            }
+
+            // Call the overload that accepts group and id, passing the new model.
+            return Update(
+                queue,
+                group: newModel.Status.Automation.GroupId,
+                id: newModel.Status.Automation.Reference.Id,
+                newModel);
+        }
+
+        /// <summary>
+        /// Attempts to update the <see cref="AutomationQueueModel"/> with the specified identifier in the given group using the provided update function.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="AutomationQueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group.</param>
+        /// <param name="id">The identifier of the item to update.</param>
+        /// <param name="updateFactory">A function that receives the current <see cref="AutomationQueueModel"/> and returns its updated version.</param>
+        /// <returns><c>true</c> if the item was successfully updated; otherwise, <c>false</c>.</returns>
+        public static bool Update(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue,
+            string group,
+            string id,
+            Func<AutomationQueueModel, AutomationQueueModel> updateFactory)
+        {
+            // Check if the specified group exists.
+            if (!queue.TryGetValue(group, out var innerQueue))
+            {
+                return false;
+            }
+
+            // Retrieve the current model for the given identifier.
+            if (!innerQueue.TryGetValue(id, out var currentModel))
+            {
+                return false;
+            }
+
+            // Compute the updated model using the provided update function.
+            var updatedModel = updateFactory(currentModel);
+
+            // Atomically update the item in the inner dictionary.
+            return innerQueue.TryUpdate(id, updatedModel, currentModel);
+        }
+
+        /// <summary>
+        /// Attempts to update the <see cref="AutomationQueueModel"/> with the specified identifier in the given group
+        /// by replacing it with the provided new model.
+        /// </summary>
+        /// <param name="queue">A concurrent dictionary where each key is a group containing a concurrent dictionary of <see cref="AutomationQueueModel"/> items.</param>
+        /// <param name="group">The key identifying the group.</param><param name="id">The identifier of the item to update.</param>
+        /// <param name="newModel">The new <see cref="AutomationQueueModel"/> instance to replace the current one.</param>
+        /// <returns><c>true</c> if the item was successfully updated; otherwise, <c>false</c>.</returns>
+        public static bool Update(
+            this ConcurrentDictionary<string, ConcurrentDictionary<string, AutomationQueueModel>> queue,
+            string group,
+            string id,
+            AutomationQueueModel newModel)
         {
             // Check if the specified group exists.
             if (!queue.TryGetValue(group, out var innerQueue))
