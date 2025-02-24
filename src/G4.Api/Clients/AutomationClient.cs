@@ -90,89 +90,141 @@ namespace G4.Api.Clients
         #endregion
 
         #region *** Methods      ***
-        /// <inheritdoc />
+        /// <summary>
+        /// Invokes automation tasks based on the provided <see cref="G4AutomationModel"/> and returns a dictionary of automation responses.
+        /// </summary>
+        /// <param name="automation">The automation model containing configuration and parameters for generating new automations.</param>
+        /// <returns>
+        /// A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.
+        /// </returns>
         public IDictionary<string, G4AutomationResponseModel> Invoke(G4AutomationModel automation)
         {
-            // Concurrent bag to store responses
-            var responseCollection = new ConcurrentBag<(string GroupId, G4AutomationResponseModel Response)>();
-
-            // A CancellationTokenSource that can be used to cancel ongoing operations in the G4Client.
-            using var cancellationTokenSource = new CancellationTokenSource();
-
-            // Generate new automations based on the provided automation model
+            // Generate new automation queue models from the provided automation model.
             var automations = automation.NewAutomations();
 
-            // Create parallel options for parallel processing
-            var parallelOptions = automation.NewParallelOptions(cancellationTokenSource.Token);
+            // Retrieve the maximum degree of parallelism from the automation settings.
+            var maxParallel = automation.GetMaxParallel();
 
-            // Iterate over each automation in the collection
-            var queueModels = NewAutomationRequests(client: this, automations, registerStatusEvents: true);
+            // Create automation queue models and register status events.
+            var automationQueueModels = NewAutomationRequests(client: this, automations, registerStatusEvents: true);
 
+            // Invoke automation tasks using the created queue models and the specified maximum degree of parallelism.
+            return Invoke(client: this, automationQueueModels, maxParallel);
+        }
+
+        /// <summary>
+        /// Invokes automation tasks based on the provided array of queue models using default parallelism settings.
+        /// </summary>
+        /// <param name="queueModels">An array of <see cref="G4QueueModel"/> instances representing automation tasks.</param>
+        /// <returns>A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.</returns>
+        public IDictionary<string, G4AutomationResponseModel> Invoke(params G4QueueModel[] queueModels)
+        {
+            // Create automation queue models from the provided queue models and register status events.
+            var automationQueueModels = NewAutomationRequests(client: this, queueModels, registerStatusEvents: true);
+
+            // Determine the default maximum degree of parallelism based on available processors.
+            var maxParallel = (Environment.ProcessorCount / 2) < 1 ? 1 : Environment.ProcessorCount / 2;
+
+            // Invoke the overload with the computed maximum degree of parallelism.
+            return Invoke(client: this, automationQueueModels, maxParallel);
+        }
+
+        /// <summary>
+        /// Invokes automation tasks based on the provided array of queue models with a specified maximum degree of parallelism.
+        /// </summary>
+        /// <param name="maxParallel">The maximum number of tasks to run concurrently.</param>
+        /// <param name="queueModels">An array of <see cref="G4QueueModel"/> instances representing automation tasks.</param>
+        /// <returns>A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.</returns>
+        public IDictionary<string, G4AutomationResponseModel> Invoke(int maxParallel, params G4QueueModel[] queueModels)
+        {
+            // Create automation queue models from the provided queue models and register status events.
+            var automationQueueModels = NewAutomationRequests(client: this, queueModels, registerStatusEvents: true);
+
+            // Invoke automation tasks based on the created automation queue models.
+            return Invoke(client: this, automationQueueModels, maxParallel);
+        }
+
+        // Invokes automation tasks based on the provided array of queue models with a specified maximum degree of parallelism.
+        private static IDictionary<string, G4AutomationResponseModel> Invoke(
+            AutomationClient client,
+            IEnumerable<AutomationQueueModel> automationQueueModels,
+            int maxParallel)
+        {
+            // CancellationTokenSource to allow cancellation of ongoing operations.
+            using var cancellationTokenSource = new CancellationTokenSource();
+
+            // Set up parallel options with the cancellation token and maximum parallelism limit.
+            var parallelOptions = new ParallelOptions
+            {
+                CancellationToken = cancellationTokenSource.Token,
+                MaxDegreeOfParallelism = maxParallel
+            };
+
+            // Collection to store responses as tuples of (GroupId, Response).
+            var responseCollection = new ConcurrentBag<(string GroupId, G4AutomationResponseModel Response)>();
+
+            // Collection to hold tasks for parallel processing of each automation queue model.
             var tasks = new ConcurrentBag<Task>();
 
-            foreach (var queueModel in queueModels)
+            // Create a task for each automation queue model to process its automation invocation in parallel.
+            foreach (var queueModel in automationQueueModels)
             {
-                // Create a new RuleSyncCallbackEventArgs instance to store rule callback
                 tasks.Add(new Task(() =>
                 {
-                    // arguments for the client and queue model instance
+                    // Prepare rule callback arguments including cancellation token, client reference, and current queue.
                     var ruleCallbackArgs = new RuleCallbackEventArgs
                     {
                         CancellationTokenSource = cancellationTokenSource,
-                        Client = this,
-                        Queue = queueModels
+                        Client = client,
+                        Queue = automationQueueModels
                     };
 
-                    // Set up the RuleInvoked event for the invoker in the queue model to
-                    // trigger the rule sync callback
+                    // Subscribe to the RuleInvoked event to trigger the rule callback.
                     queueModel.Invoker.RuleInvoked += (_, args) =>
                     {
-                        // Update the rule callback arguments with the event arguments
+                        // Update callback arguments with event data.
                         ruleCallbackArgs.RuleEventArgs = args;
 
-                        // Invoke the rule sync callback event on the client
-                        RuleCallback?.Invoke(sender: this, e: ruleCallbackArgs);
+                        // Trigger the rule callback event on the client.
+                        client.RuleCallback?.Invoke(sender: client, e: ruleCallbackArgs);
 
-                        // Check for cancellation request and throw if requested
+                        // Check for cancellation and throw if cancellation is requested.
                         ruleCallbackArgs.CancellationTokenSource.Token.ThrowIfCancellationRequested();
                     };
 
-                    // Create a new AutomationSyncCallbackEventArgs instance to store automation callback
-                    // arguments for the client and queue model instance
+                    // Prepare automation callback arguments including cancellation token, client reference, and current queue.
                     var automationCallbackArgs = new AutomationCallbackEventArgs
                     {
                         CancellationTokenSource = cancellationTokenSource,
-                        Client = this,
-                        Queue = queueModels
+                        Client = client,
+                        Queue = automationQueueModels
                     };
 
-                    // Set up the AutomationInvoked event for the invoker in the queue model to
-                    // trigger the automation sync callback
+                    // Subscribe to the AutomationInvoked event to trigger the automation callback.
                     queueModel.Invoker.AutomationInvoked += (_, args) =>
                     {
-                        // New response based on the queue model and automation response model
+                        // Create a new response based on the event response and the queue model.
                         var response = queueModel.NewResponse(args.Response);
 
-                        // Add the response to the collection of responses for the client to process
-                        // later on completion of the automation process for the queue model instance
+                        // Add the response to the collection for later processing.
                         responseCollection.Add(response);
 
-                        // Update the automation callback arguments with the event arguments
+                        // Update the automation callback arguments with event data.
                         automationCallbackArgs.AutomationEventArgs = args;
 
-                        // Invoke the automation sync callback event on the client
-                        AutomationCallback?.Invoke(sender: this, e: automationCallbackArgs);
+                        // Trigger the automation callback event on the client.
+                        client.AutomationCallback?.Invoke(sender: client, e: automationCallbackArgs);
 
-                        // Check for cancellation request and throw if requested
+                        // Check for cancellation and throw if cancellation is requested.
                         automationCallbackArgs.CancellationTokenSource.Token.ThrowIfCancellationRequested();
                     };
 
-                    // Invoke automation for the current queue model
+                    // Invoke automation processing for the current queue model.
                     queueModel.Invoker.Invoke();
                 }));
             }
 
-            // Parallel processing until all automations are processed or cancellation is requested
+            // Process all tasks in parallel until they complete or cancellation is requested.
             try
             {
                 Parallel.ForEach(tasks, parallelOptions, task =>
@@ -181,18 +233,18 @@ namespace G4.Api.Clients
                     task.Wait();
                 });
             }
-            // Silence the exception if the task was canceled by the
-            // user or client code and not due to an error in the task itself
+            // Log information if the process is canceled.
             catch (OperationCanceledException e)
             {
-                Logger.LogInformation(exception: e, "The automation process was canceled by the user.");
+                client.Logger.LogInformation(exception: e, "The automation process was canceled by the user.");
             }
+            // Log any other errors that occur during invocation.
             catch (Exception e)
             {
-                Logger.LogError(exception: e, "An error occurred while invoking the automation process.");
+                client.Logger.LogError(exception: e, "An error occurred while invoking the automation process.");
             }
 
-            // Return the results
+            // Convert the collected responses into a dictionary and return the result.
             return responseCollection.NewAutomationResponse();
         }
 
@@ -242,6 +294,44 @@ namespace G4.Api.Clients
 
             // Return the list of new automation queue models
             return queueModels;
+        }
+
+        // Creates new automation queue models from the provided queue models and registers status events if specified.
+        private static ConcurrentBag<AutomationQueueModel> NewAutomationRequests(
+            AutomationClient client,
+            IEnumerable<G4QueueModel> queueModels,
+            bool registerStatusEvents)
+        {
+            // Initialize a concurrent collection to store the resulting automation queue models.
+            var automationQueueModels = new ConcurrentBag<AutomationQueueModel>();
+
+            // Process each queue model in the provided collection.
+            for (int i = 0; i < queueModels.Count(); i++)
+            {
+                // Retrieve the automation instance from the current queue model.
+                var automation = queueModels.ElementAt(i).Automation;
+
+                // Create a new automation invoker using the retrieved automation instance.
+                var invoker = new AutomationInvoker(automation);
+
+                // Construct a new automation queue model using the invoker and the current queue model.
+                var queueModel = new AutomationQueueModel(invoker, queueModels.ElementAt(i));
+
+                // If registration of status events is enabled, attach the necessary event handlers.
+                if (registerStatusEvents)
+                {
+                    RegisterInvokerEvents(client, automation, invoker);
+                }
+
+                // Invoke the AutomationRequestInitialized event on the client to notify that a new automation request has been initialized.
+                client.AutomationRequestInitialized?.Invoke(sender: client, e: queueModel);
+
+                // Add the constructed queue model to the concurrent collection.
+                automationQueueModels.Add(queueModel);
+            }
+
+            // Return the collection of new automation queue models.
+            return automationQueueModels;
         }
 
         // Registers event handlers for the invoker by wrapping the client's event handlers with exception handling and logging.
