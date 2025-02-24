@@ -6,7 +6,9 @@ using G4.Plugins;
 using Microsoft.Extensions.Logging;
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace G4.Api.Abstractions
 {
@@ -21,20 +23,20 @@ namespace G4.Api.Abstractions
         ///// </summary>
         //event EventHandler<AutomationCallbackEventArgs> AutomationCallback;
 
-        ///// <summary>
-        ///// Occurs after an automation has been invoked.
-        ///// </summary>
-        //event EventHandler<AutomationEventArgs> AutomationInvoked;
+        /// <summary>
+        /// Occurs after an automation has been invoked.
+        /// </summary>
+        event EventHandler<AutomationEventArgs> AutomationInvoked;
 
         ///// <summary>
         ///// Occurs before invoking an automation.
         ///// </summary>
         //event EventHandler<AutomationEventArgs> AutomationInvoking;
 
-        ///// <summary>
-        ///// Occurs when an automation request is initialized.
-        ///// </summary>
-        //event EventHandler<AutomationQueueModel> AutomationRequestInitialized;
+        /// <summary>
+        /// Occurs when an automation request is initialized.
+        /// </summary>
+        event EventHandler<AutomationQueueModel> AutomationRequestInitialized;
 
         ///// <summary>
         ///// Occurs whenever the status of an automation changes.
@@ -114,44 +116,59 @@ namespace G4.Api.Abstractions
 
         #region *** Properties ***
         /// <summary>
+        /// Gets the concurrent queue of active automation queue models.
+        /// </summary>
+        ConcurrentDictionary<string, AutomationQueueModel> Active { get; }
+
+        /// <summary>
         /// Gets the logger instance used for logging within the automation client.
         /// </summary>
         ILogger Logger { get; }
 
+        /// <summary>
+        /// Gets the queue manager instance used for managing automation queues.
+        /// </summary>
         IQueueManager QueueManager { get; }
         #endregion
 
         #region *** Methods    ***
         ///// <summary>
-        ///// Invokes the automation process for the provided automation model.
+        ///// Adds an automation queue model to the active queue, organizing it under the appropriate group.
         ///// </summary>
-        ///// <param name="automation">The automation model to be invoked.</param>
-        ///// <returns>
-        ///// A dictionary where the keys are group IDs and the values are automation response models.
-        ///// </returns>
-        //IDictionary<string, G4AutomationResponseModel> Invoke(G4AutomationModel automation);
-
-        /// <summary>
-        /// Adds an automation queue model to the active queue, organizing it under the appropriate group.
-        /// </summary>
-        /// <param name="queueModel">The <see cref="AutomationQueueModel"/> instance representing the automation to be marked as active.</param>
-        void AddActiveAutomation(AutomationQueueModel queueModel);
+        ///// <param name="queueModel">The <see cref="G4QueueModel"/> instance representing the automation to be marked as active.</param>
+        //void AddActiveAutomation(G4QueueModel queueModel);
 
         /// <summary>
         /// Adds a new automation by generating a set of automation requests from the provided automation model,
         /// creating corresponding queue models, and enqueuing them as pending tasks.
         /// </summary>
         /// <param name="automation">
-        /// The <see cref="G4AutomationModel"/> instance representing the automation configuration from which
+        /// The <see cref="G4QueueModel"/> instance representing the automation configuration from which
         /// individual automation requests will be derived.
         /// </param>
         void AddPendingAutomation(G4AutomationModel automation);
 
         /// <summary>
-        /// Retrieves the next pending automation queue model.
+        /// Enables pending automation by retrieving the next pending automation queue model, 
+        /// creating corresponding automation queue models, setting their status to 'Processing',
+        /// and adding them to the active collection.
         /// </summary>
-        /// <returns>The next <see cref="AutomationQueueModel"/> from the pending queue.</returns>
-        AutomationQueueModel GetPendingAutomation();
+        void EnablePendingAutomation();
+
+        /// <summary>
+        /// Retrieves the next active automation queue model from the active queue.
+        /// </summary>
+        /// <returns>The next <see cref="AutomationQueueModel"/> in the active queue, or <c>null</c> if no active automation is available.</returns>
+        AutomationQueueModel GetActiveAutomation();
+
+        /// <summary>
+        /// Retrieves an active automation queue model by its identifier from the active queue.
+        /// </summary>
+        /// <param name="id">The identifier of the automation to retrieve.</param>
+        /// <returns>The <see cref="AutomationQueueModel"/> matching the specified identifier, or <c>null</c> if not found.</returns>
+        AutomationQueueModel GetActiveAutomation(string id);
+
+        Task<IDictionary<string, G4AutomationResponseModel>> StartAsync();
         #endregion
     }
 }
