@@ -4,12 +4,16 @@ using G4.Extensions;
 using G4.Models;
 using G4.Plugins.Engine;
 
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace G4.Api.Clients
 {
@@ -19,108 +23,305 @@ namespace G4.Api.Clients
     /// <param name="logger">The logger instance for logging.</param>
     internal class AutomationAsyncClient(ILogger logger, IQueueManager queueManager) : ClientBase, IAutomationAsyncClient
     {
+        /// <inheritdoc />
+        public event EventHandler<AutomationEventArgs> AutomationInvoked;
+
+        /// <inheritdoc />
+        public event EventHandler<AutomationQueueModel> AutomationRequestInitialized;
+
+        /// <summary>
+        /// This event is raised whenever the status of an automation changes.
+        /// </summary>
+        public event EventHandler<AutomationEventArgs> AutomationStatusChanged;
+
         public AutomationAsyncClient(ILogger logger)
             : this(logger, queueManager: new BasicQueueManager())
         { }
 
-        public IQueueManager QueueManager => queueManager;
+        /// <inheritdoc />
+        public ConcurrentDictionary<string, AutomationQueueModel> Active { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        public ILogger Logger => logger;
+        public CancellationTokenSource CancellationTokenSource { get; private set; } = new CancellationTokenSource();
+
+        public ConcurrentDictionary<string, G4AutomationResponseModel> Completed { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         /// <inheritdoc />
-        public void AddActiveAutomation(AutomationQueueModel queueModel)
-        {
-            // Extract the progress status identifier from the queue model.
-            var statusId = queueModel.Status.ProgressStatus.Id;
+        public IQueueManager QueueManager => queueManager;
 
-            // Extract the automation instance from the queue model.
-            var automation = queueModel.Status.Automation;
+        /// <inheritdoc />
+        public ILogger Logger => logger;
 
-            // Extract the progress status group identifier from the queue model.
-            var statusGroupId = queueModel.Status.ProgressStatus.GroupId;
+        /// <summary>
+        /// Gets the concurrent queue of pending automation queue models.
+        /// </summary>
+        public ConcurrentQueue<AutomationQueueModel> Pending { get; }
 
-            // Determine the effective group identifier: use the progress status group if available
-            // otherwise, use the automation's group.
-            var groupId = string.IsNullOrEmpty(statusGroupId) ? automation.GroupId : statusGroupId;
+        /// <summary>
+        /// Gets the concurrent bag of automation queue models with errors.
+        /// </summary>
+        public ConcurrentBag<G4QueueModel> Errors { get; }
 
-            // Determine the effective automation identifier: use the progress status ID if available
-            // otherwise, use the automation reference's ID.
-            var id = string.IsNullOrEmpty(statusId) ? automation.Reference.Id : statusId;
+        ///// <inheritdoc />
+        //public void AddActiveAutomation(G4QueueModel queueModel)
+        //{
+        //    try
+        //    {
+        //        // Add the automation queue model to the active queue.
+        //        queueManager.AddActive(queueModel);
 
-            // Attempt to retrieve the active automation group from the queue manager.
-            if (!QueueManager.Active.TryGetValue(groupId, out ConcurrentDictionary<string, AutomationQueueModel> group))
-            {
-                // If the group doesn't exist, create a new thread-safe dictionary for it.
-                group = [];
-                QueueManager.Active[groupId] = group;
-            }
-
-            // Set the status of the queue model to "Processing".
-            queueModel.Status.ProgressStatus.Status = G4QueueModel.QueueStatusCodes.Processing;
-
-            // Add or update the automation queue model in the active group
-            // using the determined automation identifier.
-            group[id] = queueModel;
-        }
+        //        // Log the successful completion of the operation.
+        //        Logger.LogDebug(
+        //            message: "Successfully added active automation {Id} to the queue.",
+        //            args: queueModel.Automation.Reference.Id);
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        // Log the error with exception details for troubleshooting.
+        //        Logger.LogError(exception: e, "Failed to add active automation to the queue.");
+        //    }
+        //}
 
         /// <inheritdoc />
         public void AddPendingAutomation(G4AutomationModel automation)
         {
             // Generate a collection of new automation instances from the provided automation model.
-            var automations = automation.NewAutomations().ToArray();
-
-            // Create queue models for each automation instance.
-            var queueModels = NewAutomationRequests(automations).ToArray();
+            var queueModels = automation.NewAutomations().Select(i => new G4QueueModel
+            {
+                Automation = i.Automation,
+                ProgressStatus = new G4AutomationStatusModel
+                {
+                    Status = G4QueueModel.QueueStatusCodes.New
+                },
+                Properties = i.DataProvider
+            });
 
             // Enqueue the generated automation queue models for further processing.
-            QueueManager.AddPending(queueModels);
+            QueueManager.AddPending(queueModels.ToArray());
         }
 
         /// <inheritdoc />
-        public AutomationQueueModel GetPendingAutomation() => QueueManager.GetPending();
+        public void EnablePendingAutomation()
+        {
+            EnableOne(client: this);
+        }
+
+        /// <inheritdoc />
+        public AutomationQueueModel GetActiveAutomation()
+        {
+            // Retrieve the first active automation from the active collection, if available.
+            var automation = Active?.Values.FirstOrDefault();
+
+            // Extract the unique identifier from the active automation's status, if it exists.
+            var id = automation?.Status?.Automation?.Reference?.Id;
+
+            // Retrieve and return the active automation by its identifier.
+            return GetOne(client: this, id);
+        }
+
+        /// <inheritdoc />
+        public AutomationQueueModel GetActiveAutomation(string id)
+        {
+            return GetOne(client: this, id);
+        }
+
+        public Task<IDictionary<string, G4AutomationResponseModel>> StartAsync()
+            => Task.Run<IDictionary<string, G4AutomationResponseModel>>(()
+                =>
+        {
+            var responseCollection = new ConcurrentDictionary<string, G4AutomationResponseModel>();
+            EnableOne(client: this);
+
+            var queueModel = GetActiveAutomation();
+
+            if (queueModel == null)
+            {
+                return responseCollection;
+            }
+
+            var invoker = queueModel.Invoker;
+            var automation = queueModel.Status.Automation;
+
+            var key = automation.Reference.Id;
+            var response = invoker.Invoke();
+
+            responseCollection[key] = response;
+            AddCompletedEntry(client: this, key, response);
+
+            return responseCollection;
+        });
+
+        /// <inheritdoc />
+        public void UpdateActive(G4QueueModel queueModel)
+        {
+            try
+            {
+                // Attempt to update the active queue model using the QueueManager.
+                QueueManager.UpdateActive(queueModel);
+
+                // Log the successful update with the automation id.
+                Logger.LogDebug(
+                    message: "Successfully updated active automation {Id} in the queue.",
+                    args: queueModel.Automation.Reference.Id);
+            }
+            catch (Exception e)
+            {
+                // Log any errors encountered during the update operation with exception details.
+                Logger.LogError(exception: e, "Failed to update active automation in the queue.");
+            }
+        }
+
+        // Adds a new completed automation response to the dictionary and ensures that only the last 100 entries are kept.
+        private static void AddCompletedEntry(AutomationAsyncClient client, string key, G4AutomationResponseModel response)
+        {
+            // Add or update the completed entry in the dictionary.
+            client.Completed[key] = response;
+
+            // Check if the dictionary has more than 100 entries.
+            if (client.Completed.Count < 100)
+            {
+                return;
+            }
+
+            // Determine how many entries to remove.
+            var excessCount = client.Completed.Count - 100;
+
+            // Order entries by their timestamp (assuming older entries have lower timestamps)
+            // and select the keys of the oldest entries.
+            var keysToRemove = client.Completed
+                .OrderBy(i => i.Value.PerformancePoint.End)
+                .Take(excessCount)
+                .Select(i => i.Key);
+
+            // Remove the oldest entries from the dictionary.
+            foreach (var oldKey in keysToRemove)
+            {
+                client.Completed.TryRemove(oldKey, out _);
+            }
+        }
+
+        private static void EnableOne(AutomationAsyncClient client)
+        {
+            try
+            {
+                // Retrieve the next pending automation queue model from the queue manager.
+                var queueModel = client.QueueManager.GetPending();
+
+                // If there is no pending automation, exit the method.
+                if (queueModel == null)
+                {
+                    return;
+                }
+
+                // Create a tuple containing the automation model and its associated properties (data source).
+                var activeAutomationModel = (queueModel.Automation, DataSource: queueModel.Properties);
+
+                // Generate one or more automation queue models based on the pending automation.
+                var automationQueueModels = NewAutomationRequests(
+                    client,
+                    automations: activeAutomationModel);
+
+                // Iterate through each generated automation queue model.
+                foreach (var automationQueueModel in automationQueueModels)
+                {
+                    // Extract the automation model and its progress status from the queue model.
+                    var automationModel = automationQueueModel.Status.Automation;
+                    var statusModel = automationQueueModel.Status.ProgressStatus;
+
+                    // Set the automation's progress status to 'Processing'.
+                    statusModel.Status = G4QueueModel.QueueStatusCodes.Processing;
+
+                    // Add the automation to the active collection using its unique reference id.
+                    client.Active[automationModel.Reference.Id] = automationQueueModel;
+                }
+            }
+            catch (Exception e)
+            {
+                // Log any errors encountered during the enabling of the pending automation.
+                client.Logger.LogError(exception: e, "Failed to enable pending automation.");
+            }
+        }
+
+        private static AutomationQueueModel GetOne(AutomationAsyncClient client, string id)
+        {
+            // Attempt to get the automation model with the specified id.
+            if (string.IsNullOrEmpty(id) || !client.Active.TryGetValue(id, out AutomationQueueModel _))
+            {
+                // Return null if no matching automation model is found.
+                return null;
+            }
+
+            // Attempt to remove the automation model from the active queue for the identified group.
+            // The removed model (if any) is stored in nextQueueModel.
+            client.Active.TryRemove(id, out var nextQueueModel);
+
+            // Return the removed automation model.
+            return nextQueueModel;
+        }
 
         // Creates new automation queue models based on the provided automation models and data providers.
         private static ConcurrentBag<AutomationQueueModel> NewAutomationRequests(
-            IEnumerable<(G4AutomationModel Automation, IDictionary<string, object> DataProvider)> automations)
+            AutomationAsyncClient client,
+            params (G4AutomationModel Automation, IDictionary<string, object> DataProvider)[] automations)
         {
             // Create a thread-safe collection to store the resulting automation queue models.
             var queueModels = new ConcurrentBag<AutomationQueueModel>();
 
             // Iterate over each automation and its corresponding data provider.
-            for (int i = 0; i < automations.Count(); i++)
+            for (int i = 0; i < automations.Length; i++)
             {
                 // Deconstruct the tuple into the automation and data provider.
-                var (automation, dataProvider) = automations.ElementAt(i);
+                var (automation, dataProvider) = automations[i];
 
                 // Create a new queue model status using the automation model and provided properties.
-                var status = automation.NewQueueModel(properties: dataProvider);
+                var queueModel = automation.NewQueueModel(properties: dataProvider);
 
                 // Initialize the automation with the cache manager and data provider.
-                status.Automation.Initialize(CacheManager.Instance, dataProvider);
+                queueModel.Automation.Initialize(CacheManager.Instance, dataProvider);
 
                 // Set the iteration number for both the automation and its reference.
-                status.Automation.Iteration = i;
-                status.Automation.Reference.Iteration = i;
+                queueModel.Automation.Iteration = i;
+                queueModel.Automation.Reference.Iteration = i;
 
                 // Update the progress status with details from the automation.
-                status.ProgressStatus.GroupId = status.Automation.GroupId;
-                status.ProgressStatus.Description = status.Automation.Reference.Description;
-                status.ProgressStatus.Iteration = i;
-                status.ProgressStatus.Name = status.Automation.Reference.Name;
-                status.ProgressStatus.Id = $"{status.Automation.Reference.Id}";
+                queueModel.ProgressStatus.GroupId = queueModel.Automation.GroupId;
+                queueModel.ProgressStatus.Description = queueModel.Automation.Reference.Description;
+                queueModel.ProgressStatus.Iteration = i;
+                queueModel.ProgressStatus.Name = queueModel.Automation.Reference.Name;
+                queueModel.ProgressStatus.Id = $"{queueModel.Automation.Reference.Id}";
 
-                // Create a new automation invoker based on the updated automation.
-                var invoker = new AutomationInvoker(status.Automation);
+                // Invoke the AutomationRequestInitialized event on the client.
+                client.AutomationRequestInitialized?.InvokeSafely(logger: client.Logger, sender: client, e: new()
+                {
+                    Status = queueModel
+                });
 
-                // Instantiate a new automation queue model using the invoker and status.
-                var queueModel = new AutomationQueueModel(invoker, status);
+                // Create a new automation invoker based on the queue model's automation.
+                var invoker = new AutomationInvoker(queueModel.Automation, client.Logger);
+
+                // Register the invoker events for the automation queue model.
+                RegisterInvokerEvents(client, invoker);
+
+                // Create a new cancellation token source for the queue model.
+                var cancellationTokenSource = new CancellationTokenSource();
+
+                // Create a new automation queue model with the invoker and status.
+                var automationQueueModel = new AutomationQueueModel(invoker, queueModel, cancellationTokenSource);
 
                 // Add the newly created queue model to the thread-safe collection.
-                queueModels.Add(queueModel);
+                queueModels.Add(automationQueueModel);
             }
 
             // Return the collection of automation queue models.
             return queueModels;
+        }
+
+        private static void RegisterInvokerEvents(AutomationAsyncClient client, IAutomationInvoker invoker)
+        {
+            invoker.AutomationInvoked += (_, args) =>
+            {
+                var e = AutomationEventArgs.New(args.Automation, args.AutomationStatus, args.Response);
+                client.AutomationInvoked?.InvokeSafely(logger:client.Logger, sender: client, e);
+            };
         }
     }
 
@@ -189,7 +390,6 @@ namespace G4.Api.Clients
     //    public ILogger Logger { get; } = logger;
 
     //    #region *** Events  ***
-    //    public event EventHandler<AutomationQueueModel> AutomationRequestInitialized;
 
     //    /// <summary>
     //    /// This event is raised whenever the status of an automation changes.
