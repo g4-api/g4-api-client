@@ -121,13 +121,26 @@ namespace G4.Api.Abstractions
 
         #region *** Methods    ***
         /// <summary>
-        /// Invokes the automation process for the provided automation model.
+        /// Invokes automation tasks based on the provided <see cref="G4AutomationModel"/> and returns a dictionary of automation responses.
         /// </summary>
-        /// <param name="automation">The automation model to be invoked.</param>
-        /// <returns>
-        /// A dictionary where the keys are group IDs and the values are automation response models.
-        /// </returns>
+        /// <param name="automation">The automation model containing configuration and parameters for generating new automations.</param>
+        /// <returns>A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.</returns>
         IDictionary<string, G4AutomationResponseModel> Invoke(G4AutomationModel automation);
+
+        /// <summary>
+        /// Invokes automation tasks based on the provided array of queue models using default parallelism settings.
+        /// </summary>
+        /// <param name="queueModels">An array of <see cref="G4QueueModel"/> instances representing automation tasks.</param>
+        /// <returns>A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.</returns>
+        IDictionary<string, G4AutomationResponseModel> Invoke(params G4QueueModel[] queueModels);
+
+        /// <summary>
+        /// Invokes automation tasks based on the provided array of queue models with a specified maximum degree of parallelism.
+        /// </summary>
+        /// <param name="maxParallel">The maximum number of tasks to run concurrently.</param>
+        /// <param name="queueModels">An array of <see cref="G4QueueModel"/> instances representing automation tasks.</param>
+        /// <returns>A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.</returns>
+        IDictionary<string, G4AutomationResponseModel> Invoke(int maxParallel, params G4QueueModel[] queueModels);
         #endregion
     }
 }
