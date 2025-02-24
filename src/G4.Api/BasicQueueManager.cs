@@ -2,6 +2,8 @@
 using G4.Extensions;
 using G4.Models;
 
+using Microsoft.Extensions.Logging;
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,12 +14,15 @@ namespace G4.Api
     /// Represents a manager for automation queues within the G4™ framework.
     /// </summary>
     [G4QueueManager(name: nameof(BasicQueueManager))]
-    public class BasicQueueManager : IQueueManager
+    public class BasicQueueManager(ILogger logger) : IQueueManager
     {
+        // Logger instance for logging queue manager activities.
+        private readonly ILogger _logger = logger;
+
         // A flag indicating whether the queue manager is paused.
         private bool _paused;
 
-        #region *** Events     ***
+        #region *** Events       ***
         /// <inheritdoc />
         public event EventHandler<G4QueueModel> ModelDequeued;
 
@@ -34,7 +39,16 @@ namespace G4.Api
         public event EventHandler<QueueManagerEventArgs> OnError;
         #endregion
 
-        #region *** Properties ***
+        #region *** Constructors ***
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BasicQueueManager"/> class.
+        /// </summary>
+        public BasicQueueManager()
+            : this(logger: null)
+        { }
+        #endregion
+
+        #region *** Properties   ***
         /// <inheritdoc />
         public ConcurrentDictionary<string, ConcurrentDictionary<string, G4QueueModel>> Active { get; } = [];
 
@@ -45,7 +59,7 @@ namespace G4.Api
         public ConcurrentBag<G4QueueModel> Errors { get; } = [];
         #endregion
 
-        #region *** Methods    ***
+        #region *** Methods      ***
         /// <inheritdoc />
         public void AddActive(params G4QueueModel[] queueModels)
         {
@@ -122,6 +136,12 @@ namespace G4.Api
         /// <inheritdoc />
         public G4QueueModel GetPending()
         {
+            // Check if the pending collection is empty.
+            if (Pending?.IsEmpty == true)
+            {
+                return null;
+            }
+
             // Try to dequeue an item from the pending collection.
             var isDequeue = Pending.TryDequeue(out var queueModel);
 
@@ -213,19 +233,28 @@ namespace G4.Api
         // Handles the occurrence of a new error in the queue manager, adding the error to the errors collection.
         private static void NewError(BasicQueueManager queueManager, G4QueueModel queueModel)
         {
-            // Create a new event args instance for the error.
-            var eventArgs = new QueueManagerEventArgs
+            try
             {
-                Collection = queueManager.Errors,
-                CollectionType = nameof(G4QueueModel.QueueStatusCodes.Error),
-                QueueModel = queueModel
-            };
+                // Create a new event args instance for the error.
+                var eventArgs = new QueueManagerEventArgs
+                {
+                    Collection = queueManager.Errors,
+                    CollectionType = nameof(G4QueueModel.QueueStatusCodes.Error),
+                    QueueModel = queueModel
+                };
 
-            // Invoke the OnError event, notifying subscribers about the error.
-            queueManager.OnError?.Invoke(queueManager, eventArgs);
+                // Invoke the OnError event, notifying subscribers about the error.
+                queueManager.OnError?.Invoke(queueManager, eventArgs);
 
-            // Add the error to the errors collection.
-            queueManager.Errors.Add(queueModel);
+                // Add the error to the errors collection.
+                queueManager.Errors.Add(queueModel);
+            }
+            catch (Exception e)
+            {
+                queueManager
+                    ._logger?
+                    .LogError(e, "An error occurred while handling a new error in the queue manager.");
+            }
         }
     }
 }
