@@ -139,13 +139,9 @@ namespace G4.Api.Abstractions
         //void AddActiveAutomation(G4QueueModel queueModel);
 
         /// <summary>
-        /// Adds a new automation by generating a set of automation requests from the provided automation model,
-        /// creating corresponding queue models, and enqueuing them as pending tasks.
+        /// Adds new pending automation requests to the queue based on the provided automation model.
         /// </summary>
-        /// <param name="automation">
-        /// The <see cref="G4QueueModel"/> instance representing the automation configuration from which
-        /// individual automation requests will be derived.
-        /// </param>
+        /// <param name="automation">The automation model containing the configuration and parameters for generating automation tasks.</param>
         void AddPendingAutomation(G4AutomationModel automation);
 
         /// <summary>

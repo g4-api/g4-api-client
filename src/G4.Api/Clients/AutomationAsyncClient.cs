@@ -84,13 +84,19 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public void AddPendingAutomation(G4AutomationModel automation)
         {
+            // Generate new automation instances along with their associated data providers from the provided model.
             var automations = automation.NewAutomations();
 
-            foreach(var (automationModel, dataProvider) in automations)
+            // Iterate over each automation instance and its corresponding data provider.
+            foreach (var (automationModel, dataProvider) in automations)
             {
+                // Initialize the automation model with the shared CacheManager instance and the data provider.
                 automationModel.Initialize(CacheManager.Instance, dataProvider);
+
+                // Create a new queue model for the automation model using the associated data provider.
                 var queueModel = automationModel.NewQueueModel(dataProvider);
 
+                // Add the newly created queue model to the pending automation queue for later processing.
                 QueueManager.AddPending(queueModel);
             }
         }
