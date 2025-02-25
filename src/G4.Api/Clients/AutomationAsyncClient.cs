@@ -84,19 +84,15 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public void AddPendingAutomation(G4AutomationModel automation)
         {
-            // Generate a collection of new automation instances from the provided automation model.
-            var queueModels = automation.NewAutomations().Select(i => new G4QueueModel
-            {
-                Automation = i.Automation,
-                ProgressStatus = new G4AutomationStatusModel
-                {
-                    Status = G4QueueModel.QueueStatusCodes.New
-                },
-                Properties = i.DataProvider
-            });
+            var automations = automation.NewAutomations();
 
-            // Enqueue the generated automation queue models for further processing.
-            QueueManager.AddPending(queueModels.ToArray());
+            foreach(var (automationModel, dataProvider) in automations)
+            {
+                automationModel.Initialize(CacheManager.Instance, dataProvider);
+                var queueModel = automationModel.NewQueueModel(dataProvider);
+
+                QueueManager.AddPending(queueModel);
+            }
         }
 
         /// <inheritdoc />
