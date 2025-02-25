@@ -311,6 +311,9 @@ namespace G4.Api.Clients
                 // Retrieve the automation instance from the current queue model.
                 var automation = queueModels.ElementAt(i).Automation;
 
+                // Initialize the automation using the cache manager
+                automation.Initialize(CacheManager.Instance);
+
                 // Create a new automation invoker using the retrieved automation instance.
                 var invoker = new AutomationInvoker(automation);
 
