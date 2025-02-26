@@ -164,6 +164,14 @@ namespace G4.Api.Abstractions
         /// <returns>The <see cref="AutomationQueueModel"/> matching the specified identifier, or <c>null</c> if not found.</returns>
         AutomationQueueModel GetActiveAutomation(string id);
 
+        /// <summary>
+        /// Starts the automation process asynchronously, returning a dictionary of automation responses
+        /// keyed by their unique reference ids.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="Task{TResult}"/> representing the asynchronous operation, with a result of
+        /// an <see cref="IDictionary{TKey, TValue}"/> mapping automation reference ids to their corresponding responses.
+        /// </returns>
         Task<IDictionary<string, G4AutomationResponseModel>> StartAsync();
         #endregion
     }

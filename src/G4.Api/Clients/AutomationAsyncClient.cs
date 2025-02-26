@@ -4,9 +4,7 @@ using G4.Extensions;
 using G4.Models;
 using G4.Plugins.Engine;
 
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Primitives;
 
 using System;
 using System.Collections.Concurrent;
@@ -40,8 +38,6 @@ namespace G4.Api.Clients
 
         /// <inheritdoc />
         public ConcurrentDictionary<string, AutomationQueueModel> Active { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-        public CancellationTokenSource CancellationTokenSource { get; private set; } = new CancellationTokenSource();
 
         public ConcurrentDictionary<string, G4AutomationResponseModel> Completed { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -126,31 +122,44 @@ namespace G4.Api.Clients
             return GetOne(client: this, id);
         }
 
+        /// <inheritdoc />
         public Task<IDictionary<string, G4AutomationResponseModel>> StartAsync()
-            => Task.Run<IDictionary<string, G4AutomationResponseModel>>(()
-                =>
-        {
-            var responseCollection = new ConcurrentDictionary<string, G4AutomationResponseModel>();
-            EnableOne(client: this);
-
-            var queueModel = GetActiveAutomation();
-
-            if (queueModel == null)
+            => Task.Run<IDictionary<string, G4AutomationResponseModel>>(() =>
             {
+                // Create a thread-safe dictionary to hold automation responses.
+                var responseCollection = new ConcurrentDictionary<string, G4AutomationResponseModel>();
+
+                // Enable one pending automation by processing it from the client queue.
+                EnableOne(client: this);
+
+                // Retrieve the currently active automation queue model.
+                var queueModel = GetActiveAutomation();
+
+                // If no active automation is found, return the empty response collection.
+                if (queueModel == null)
+                {
+                    return responseCollection;
+                }
+
+                // Retrieve the automation invoker and the automation model from the queue.
+                var invoker = queueModel.Invoker;
+                var automation = queueModel.Status.Automation;
+
+                // Use the automation's unique reference id as the key.
+                var key = automation.Reference.Id;
+
+                // Invoke the automation and capture the response.
+                var response = invoker.Invoke();
+
+                // Store the response in the collection using the unique key.
+                responseCollection[key] = response;
+
+                // Add a completed entry to the client log or history for the processed automation.
+                AddCompletedEntry(client: this, key, response);
+
+                // Return the collection of responses.
                 return responseCollection;
-            }
-
-            var invoker = queueModel.Invoker;
-            var automation = queueModel.Status.Automation;
-
-            var key = automation.Reference.Id;
-            var response = invoker.Invoke();
-
-            responseCollection[key] = response;
-            AddCompletedEntry(client: this, key, response);
-
-            return responseCollection;
-        });
+            });
 
         /// <inheritdoc />
         public void UpdateActive(G4QueueModel queueModel)
@@ -201,6 +210,8 @@ namespace G4.Api.Clients
             }
         }
 
+        // Enables one pending automation by retrieving it from the queue manager,
+        // generating corresponding automation queue models, and setting their processing status.
         private static void EnableOne(AutomationAsyncClient client)
         {
             try
@@ -243,16 +254,18 @@ namespace G4.Api.Clients
             }
         }
 
+        // Retrieves and removes an automation queue model with the specified identifier from the active queue.
         private static AutomationQueueModel GetOne(AutomationAsyncClient client, string id)
         {
             // Attempt to get the automation model with the specified id.
+            // If the id is null, empty, or not found in the active queue, return null.
             if (string.IsNullOrEmpty(id) || !client.Active.TryGetValue(id, out AutomationQueueModel _))
             {
                 // Return null if no matching automation model is found.
                 return null;
             }
 
-            // Attempt to remove the automation model from the active queue for the identified group.
+            // Attempt to remove the automation model from the active queue.
             // The removed model (if any) is stored in nextQueueModel.
             client.Active.TryRemove(id, out var nextQueueModel);
 
@@ -317,12 +330,18 @@ namespace G4.Api.Clients
             return queueModels;
         }
 
+        // Registers event handlers for the automation invoker events, allowing the client to respond
+        // to automation invocations in a safe and logged manner.
         private static void RegisterInvokerEvents(AutomationAsyncClient client, IAutomationInvoker invoker)
         {
+            // Subscribe to the AutomationInvoked event of the invoker.
             invoker.AutomationInvoked += (_, args) =>
             {
+                // Create a new automation event argument using the provided automation details, status, and response.
                 var e = AutomationEventArgs.New(args.Automation, args.AutomationStatus, args.Response);
-                client.AutomationInvoked?.InvokeSafely(logger:client.Logger, sender: client, e);
+
+                // Safely invoke the client's AutomationInvoked event, ensuring that any exceptions are logged.
+                client.AutomationInvoked?.InvokeSafely(logger: client.Logger, sender: client, e);
             };
         }
     }
