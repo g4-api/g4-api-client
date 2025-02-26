@@ -121,6 +121,11 @@ namespace G4.Api.Abstractions
         ConcurrentDictionary<string, AutomationQueueModel> Active { get; }
 
         /// <summary>
+        /// Gets the concurrent queue of completed automation responses.
+        /// </summary>
+        ConcurrentDictionary<string, G4AutomationResponseModel> Completed { get; }
+
+        /// <summary>
         /// Gets the logger instance used for logging within the automation client.
         /// </summary>
         ILogger Logger { get; }
@@ -137,6 +142,13 @@ namespace G4.Api.Abstractions
         ///// </summary>
         ///// <param name="queueModel">The <see cref="G4QueueModel"/> instance representing the automation to be marked as active.</param>
         //void AddActiveAutomation(G4QueueModel queueModel);
+
+        /// <summary>
+        /// Adds or updates a completed automation response entry for the given key, and purges older entries if necessary.
+        /// </summary>
+        /// <param name="key">The unique identifier of the automation process.</param>
+        /// <param name="response">The <see cref="G4AutomationResponseModel"/> containing the automation response data.</param>
+        void AddCompletedAutomation(string key, G4AutomationResponseModel response);
 
         /// <summary>
         /// Adds new pending automation requests to the queue based on the provided automation model.

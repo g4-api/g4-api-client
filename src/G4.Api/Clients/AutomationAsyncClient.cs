@@ -39,6 +39,7 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public ConcurrentDictionary<string, AutomationQueueModel> Active { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        /// <inheritdoc />
         public ConcurrentDictionary<string, G4AutomationResponseModel> Completed { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         /// <inheritdoc />
@@ -76,6 +77,12 @@ namespace G4.Api.Clients
         //        Logger.LogError(exception: e, "Failed to add active automation to the queue.");
         //    }
         //}
+
+        /// <inheritdoc />
+        public void AddCompletedAutomation(string key, G4AutomationResponseModel response)
+        {
+            AddCompletedEntry(client: this, key, response);
+        }
 
         /// <inheritdoc />
         public void AddPendingAutomation(G4AutomationModel automation)
