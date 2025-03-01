@@ -1,11 +1,15 @@
-﻿using G4.Extensions;
+﻿using G4.Api;
+using G4.Extensions;
 using G4.IntegrationTests.Engine;
 using G4.IntegrationTests.Extensions;
 using G4.IntegrationTests.Framework;
+using G4.Models;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace G4.IntegrationTests.Suites.Engine
 {
@@ -15,6 +19,18 @@ namespace G4.IntegrationTests.Suites.Engine
     [TestCategory("Engine")]
     public class MultiPhaseDriverTests : TestBase
     {
+        [TestMethod]
+        public void Test()
+        {
+            var json = File.ReadAllText(@"E:\Garbage\z.txt");
+            var autoation = JsonSerializer.Deserialize<G4AutomationModel>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            var client = new G4Client();
+            var response = client.Automation.Invoke(autoation);
+        }
+
         [TestMethod(displayName: "Verify that two WebDriver instances are initiated when a " +
             "job takes the driver from its parent stage.")]
         #region *** Data Set ***
