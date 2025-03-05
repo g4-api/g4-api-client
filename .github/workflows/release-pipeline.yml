@@ -18,7 +18,7 @@ permissions:
 on:
   push:
     branches:
-      - none
+      - main
 
 env:
   #
