@@ -30,9 +30,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="G4.Plugins" Version="2025.2.18.33" />
-		<PackageReference Include="G4.Plugins.Common" Version="2025.2.18.102" />
-		<PackageReference Include="G4.Plugins.Ui" Version="2025.2.18.102" />
+		<PackageReference Include="G4.Plugins" Version="2025.3.7.34" />
+		<PackageReference Include="G4.Plugins.Common" Version="2025.3.8.104" />
+		<PackageReference Include="G4.Plugins.Ui" Version="2025.3.8.104" />
 	</ItemGroup>
 
 </Project>
