@@ -4,9 +4,12 @@ using G4.Models;
 
 using LiteDB;
 
+using Microsoft.Extensions.Primitives;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 
 namespace G4.Api.Clients
 {
@@ -284,10 +287,46 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public int SetEnvironment(string name, IDictionary<string, string> parameters, bool encode, string encryptionKey)
         {
+            // Initializes a new environment with the specified name and parameters.
+            static void InitializeEnvironment(
+                ILiteCollection<ApplicationParametersModel> collection,
+                string name, IDictionary<string, string> parameters,
+                bool encode,
+                string encryptionKey)
+            {
+                // Create a new ApplicationParametersModel with a unique ID, the specified name, and the provided parameters.
+                var document = new ApplicationParametersModel
+                {
+                    Id = Guid.NewGuid(),
+                    Name = name,
+                    Parameters = InitializeParameters(parameters, encode, encryptionKey)
+                };
+
+                // Insert the newly created parameters model into the collection.
+                collection.Insert(document);
+            }
+
+            // Initializes a collection of parameters by optionally encrypting and encoding their values.
+            static Dictionary<string, object> InitializeParameters(
+                    IDictionary<string, string> parameters, bool encode, string encryptionKey)
+            {
+                // Create a dictionary to hold the processed parameters.
+                var parametersCollection = new Dictionary<string, object>();
+
+                // Iterate through each key-value pair in the provided parameters dictionary.
+                foreach (var parameter in parameters)
+                {
+                    // Store the processed value in the collection using the original parameter key.
+                    parametersCollection[parameter.Key] = InitializeParameterValue(value: parameter.Value, encode, encryptionKey);
+                }
+
+                // Return the collection of processed parameters.
+                return parametersCollection;
+            }
+
             // Initialize parameters to an empty dictionary if it is null
             parameters ??= new Dictionary<string, string>();
 
-            // TODO: Find a way to remove double call to GetDocument when calling InitializeEnvironment
             // Attempt to find the existing parameters model in the collection
             var (collection, documents) = GetDocuments(LiteDatabase, name);
 
@@ -295,7 +334,7 @@ namespace G4.Api.Clients
             if (documents.Length == 0)
             {
                 // Initialize the environment if the parameters model does not exist
-                InitializeEnvironment(LiteDatabase, name, parameters, encode, encryptionKey);
+                InitializeEnvironment(collection, name, parameters, encode, encryptionKey);
 
                 // Return 201 Created to indicate successful initialization
                 return 201;
@@ -310,7 +349,7 @@ namespace G4.Api.Clients
                 // Iterate through each parameter and update or add it to the Parameters dictionary
                 foreach (var parameter in parameters)
                 {
-                    document.Parameters[parameter.Key] = parameter.Value;
+                    document.Parameters[parameter.Key] = InitializeParameterValue(value: parameter.Value, encode, encryptionKey);
                 }
 
                 // Update the parameters model in the collection to persist the changes
@@ -321,58 +360,16 @@ namespace G4.Api.Clients
             return 204;
         }
 
-        // Initializes a new environment with the specified name and parameters.
-        private static void InitializeEnvironment(
-            ILiteDatabase liteDatabase,
-            string name, IDictionary<string, string> parameters,
-            bool encode,
-            string encryptionKey)
+        // Initializes the parameter value by optionally encrypting and encoding it.
+        private static string InitializeParameterValue(string value, bool encode, string encryptionKey)
         {
-            // Initializes a collection of parameters by optionally encrypting and encoding their values.
-            static Dictionary<string, object> InitializeParameters(IDictionary<string, string> parameters, bool encode, string encryptionKey)
-            {
-                // Create a dictionary to hold the processed parameters.
-                var parametersCollection = new Dictionary<string, object>();
+            // Encrypt the value if an encryption key is provided.
+            value = !string.IsNullOrEmpty(encryptionKey)
+                ? value.Encrypt(encryptionKey)
+                : value;
 
-                // Iterate through each key-value pair in the provided parameters dictionary.
-                foreach (var parameter in parameters)
-                {
-                    // If an encryption key is provided, encrypt the value; otherwise, use the original value.
-                    var value = !string.IsNullOrEmpty(encryptionKey)
-                        ? parameter.Value.Encrypt(encryptionKey)
-                        : parameter.Value;
-
-                    // If encoding is enabled, convert the value to its Base64 representation.
-                    value = encode ? value.ConvertToBase64() : value;
-
-                    // Store the processed value in the collection using the original parameter key.
-                    parametersCollection[parameter.Key] = value;
-                }
-
-                // Return the collection of processed parameters.
-                return parametersCollection;
-            }
-
-            // Retrieve the collection and existing documents for the specified environment name.
-            var (collection, documents) = GetDocuments(liteDatabase, name);
-
-            // Check if the parameters model already exists.
-            if (documents.Length > 0)
-            {
-                // If the parameters model exists, return HTTP 204 No Content with the existing model.
-                return;
-            }
-
-            // Create a new ApplicationParametersModel with a unique ID, the specified name, and the provided parameters.
-            var document = new ApplicationParametersModel
-            {
-                Id = Guid.NewGuid(),
-                Name = name,
-                Parameters = InitializeParameters(parameters, encode, encryptionKey)
-            };
-
-            // Insert the newly created parameters model into the collection.
-            collection.Insert(document);
+            // Encode the value in Base64 if encoding is enabled, otherwise return the original value.
+            return encode ? value.ConvertToBase64() : value;
         }
 
         // Retrieves a single ApplicationParametersModel document from the specified LiteDatabase collection based on the provided environment name.
