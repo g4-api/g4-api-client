@@ -4,6 +4,8 @@ using G4.Models;
 
 using LiteDB;
 
+using Microsoft.Extensions.Primitives;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,7 +41,19 @@ namespace G4.Api.Clients
         }
 
         /// <inheritdoc />
+        public string GetParameter(string environment, string parameter)
+        {
+            return GetParameter(environment, parameter, decode: true, encryptionKey: default);
+        }
+
+        /// <inheritdoc />
         public string GetParameter(string environment, string parameter, bool decode)
+        {
+            return GetParameter(environment, parameter, decode, encryptionKey: default);
+        }
+
+        /// <inheritdoc />
+        public string GetParameter(string environment, string parameter, bool decode, string encryptionKey)
         {
             // Retrieve the environment parameters for the specified environment name
             var applicationEnviornment = G4Environment
@@ -56,9 +70,14 @@ namespace G4.Api.Clients
             }
 
             // Return the decoded value if requested, otherwise return the raw value as a string
-            return decode
+            var decodedValue = decode
                 ? $"{value}".ConvertFromBase64()
                 : $"{value}";
+
+            // Return the decrypted value if an encryption key is provided, otherwise return the decoded value
+            return !string.IsNullOrEmpty(encryptionKey)
+                ? decodedValue.Decrypt(encryptionKey)
+                : decodedValue;
         }
 
         /// <inheritdoc />
@@ -204,8 +223,15 @@ namespace G4.Api.Clients
                     Name = name
                 };
 
+                // Encrypt the parameter value if an encryption key is provided
+                parameterValue = !string.IsNullOrEmpty(parameter.EncryptionKey)
+                    ? parameter.Value.Encrypt(parameter.EncryptionKey)
+                    : parameter.Value;
+
                 // Encode the parameter value if required
-                parameterValue = parameter.Encode ? parameter.Value.ConvertToBase64() : parameter.Value;
+                parameterValue = parameter.Encode
+                    ? parameter.Value.ConvertToBase64()
+                    : parameter.Value;
 
                 // Check if the Parameters dictionary is null (i.e., no parameters exist)
                 if (document.Parameters == null)
@@ -254,6 +280,12 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public int SetEnvironment(string name, IDictionary<string, string> parameters, bool encode)
         {
+            return SetEnvironment(name, parameters, encode, encryptionKey: default);
+        }
+
+        /// <inheritdoc />
+        public int SetEnvironment(string name, IDictionary<string, string> parameters, bool encode, string encryptionKey)
+        {
             // Initialize parameters to an empty dictionary if it is null
             parameters ??= new Dictionary<string, string>();
 
@@ -265,7 +297,7 @@ namespace G4.Api.Clients
             if (documents.Length == 0)
             {
                 // Initialize the environment if the parameters model does not exist
-                InitializeEnvironment(LiteDatabase, name, parameters, encode);
+                InitializeEnvironment(LiteDatabase, name, parameters, encode, encryptionKey);
 
                 // Return 201 Created to indicate successful initialization
                 return 201;
@@ -292,8 +324,37 @@ namespace G4.Api.Clients
         }
 
         // Initializes a new environment with the specified name and parameters.
-        private static void InitializeEnvironment(ILiteDatabase liteDatabase, string name, IDictionary<string, string> parameters, bool encode)
+        private static void InitializeEnvironment(
+            ILiteDatabase liteDatabase,
+            string name, IDictionary<string, string> parameters,
+            bool encode,
+            string encryptionKey)
         {
+            // Initializes a collection of parameters by optionally encrypting and encoding their values.
+            static Dictionary<string, object> InitializeParameters(IDictionary<string, string> parameters, bool encode, string encryptionKey)
+            {
+                // Create a dictionary to hold the processed parameters.
+                var parametersCollection = new Dictionary<string, object>();
+
+                // Iterate through each key-value pair in the provided parameters dictionary.
+                foreach (var parameter in parameters)
+                {
+                    // If an encryption key is provided, encrypt the value; otherwise, use the original value.
+                    var value = !string.IsNullOrEmpty(encryptionKey)
+                        ? parameter.Value.Encrypt(encryptionKey)
+                        : parameter.Value;
+
+                    // If encoding is enabled, convert the value to its Base64 representation.
+                    value = encode ? value.ConvertToBase64() : value;
+
+                    // Store the processed value in the collection using the original parameter key.
+                    parametersCollection[parameter.Key] = value;
+                }
+
+                // Return the collection of processed parameters.
+                return parametersCollection;
+            }
+
             // Retrieve the collection and existing documents for the specified environment name.
             var (collection, documents) = GetDocuments(liteDatabase, name);
 
@@ -309,9 +370,7 @@ namespace G4.Api.Clients
             {
                 Id = Guid.NewGuid(),
                 Name = name,
-                Parameters = parameters?.ToDictionary(
-                    k => k.Key,
-                    v => encode ? (object)v.Value.ConvertToBase64() : v.Value)
+                Parameters = InitializeParameters(parameters, encode, encryptionKey)
             };
 
             // Insert the newly created parameters model into the collection.
