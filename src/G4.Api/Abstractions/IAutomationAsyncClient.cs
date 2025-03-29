@@ -1,7 +1,4 @@
-﻿using G4.Api.Models;
-using G4.Models;
-using G4.Models.Events;
-using G4.Plugins;
+﻿using G4.Models;
 
 using Microsoft.Extensions.Logging;
 
