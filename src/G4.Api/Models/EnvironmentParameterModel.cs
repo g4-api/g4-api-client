@@ -14,6 +14,11 @@ namespace G4.Models
         public bool Encode { get; set; } = true;
 
         /// <summary>
+        /// The encryption key used to encrypt the parameter value.
+        /// </summary>
+        public string EncryptionKey { get; set; }
+
+        /// <summary>
         /// The name of the environment.
         /// </summary>
         /// <remarks>Required field; must match the regular expression \w+</remarks>
