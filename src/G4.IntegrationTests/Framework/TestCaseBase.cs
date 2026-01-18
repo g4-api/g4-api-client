@@ -45,12 +45,12 @@ namespace G4.IntegrationTests.Framework
             _environments ??= [];
 
             // Parse and set the number of test case attempts
-            _attempts = context.Properties.Contains(key: "Integration.NumberOfAttempts")
+            _attempts = context.Properties.ContainsKey(key: "Integration.NumberOfAttempts")
                 ? int.Parse($"{context.Properties["Integration.NumberOfAttempts"]}")
                 : int.Parse("1");
 
             // Parse and set the time interval between test case attempts
-            _attemptsDelay= context.Properties.Contains(key: "Integration.AttemptsDelay")
+            _attemptsDelay= context.Properties.ContainsKey(key: "Integration.AttemptsDelay")
                 ? int.Parse($"{context.Properties["Integration.AttemptsDelay"]}")
                 : int.Parse("15000");
 

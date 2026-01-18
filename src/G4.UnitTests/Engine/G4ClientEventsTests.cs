@@ -18,7 +18,7 @@ namespace G4.UnitTests.Engine
     {
         public TestContext TestContext { get; set; }
 
-        [TestMethod(displayName: "Verify PluginCreated event fired for all plugins when invoking automation model")]
+        [TestMethod(DisplayName = "Verify PluginCreated event fired for all plugins when invoking automation model")]
         public void G4ClientPluginCreatedEventNoDataTest()
         {
             // Create automation model using test context
@@ -37,10 +37,10 @@ namespace G4.UnitTests.Engine
             client.Automation.Invoke(automation);
 
             // Assert that the PluginCreated event fired for all plugins
-            Assert.AreEqual(48, results.Count, "PluginCreated event did not fire for all plugins.");
+            Assert.HasCount(expected: 48, collection: results, message: "PluginCreated event did not fire for all plugins.");
         }
 
-        [TestMethod(displayName: "Verify the G4Client PluginCreated event is triggered correctly with the expected data.")]
+        [TestMethod(DisplayName = "Verify the G4Client PluginCreated event is triggered correctly with the expected data.")]
         public void G4ClientPluginCreatedEventWithDataTest()
         {
             // Create automation model using test context, without data

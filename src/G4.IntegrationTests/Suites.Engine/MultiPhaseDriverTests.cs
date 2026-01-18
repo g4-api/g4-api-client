@@ -1,15 +1,11 @@
-﻿using G4.Api;
-using G4.Extensions;
+﻿using G4.Extensions;
 using G4.IntegrationTests.Engine;
 using G4.IntegrationTests.Extensions;
 using G4.IntegrationTests.Framework;
-using G4.Models;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace G4.IntegrationTests.Suites.Engine
 {
@@ -19,19 +15,7 @@ namespace G4.IntegrationTests.Suites.Engine
     [TestCategory("Engine")]
     public class MultiPhaseDriverTests : TestBase
     {
-        [TestMethod]
-        public void Test()
-        {
-            var json = File.ReadAllText(@"E:\Garbage\z.txt");
-            var autoation = JsonSerializer.Deserialize<G4AutomationModel>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-            var client = new G4Client();
-            var response = client.Automation.Invoke(autoation);
-        }
-
-        [TestMethod(displayName: "Verify that two WebDriver instances are initiated when a " +
+        [TestMethod(DisplayName = "Verify that two WebDriver instances are initiated when a " +
             "job takes the driver from its parent stage.")]
         #region *** Data Set ***
         [DataRow("Default()")]
@@ -60,10 +44,11 @@ namespace G4.IntegrationTests.Suites.Engine
             var sessions = driverSessions.Concat([automationDriverSession]).Distinct().ToArray();
 
             // Assert that exactly two unique driver sessions were created
-            Assert.AreEqual(
+            Assert.HasCount(
                 expected: 2,
-                actual: sessions.Length,
-                message: "Expected two distinct WebDriver sessions to be initiated.");
+                collection: sessions,
+                message: "Expected two distinct WebDriver sessions to be initiated."
+            );
 
             // Assert that none of the plugins within the job are using the automation driver
             // They must be using the driver created by the stage instead
@@ -79,7 +64,7 @@ namespace G4.IntegrationTests.Suites.Engine
                 message: "The 'TestParameter' should be 'Foo Bar' after decoding.");
         }
 
-        [TestMethod(displayName: "Verify that a stage can take a driver from the preceding " +
+        [TestMethod(DisplayName = "Verify that a stage can take a driver from the preceding " +
             "stage or use the default driver from the parent automation.")]
         #region *** Data Set ***
         [DataRow("Default()")]
@@ -108,16 +93,18 @@ namespace G4.IntegrationTests.Suites.Engine
             var sessions = driverSessions.Concat([automationDriverSession]).Distinct().ToArray();
 
             // Assert that exactly two unique driver sessions were created
-            Assert.AreEqual(
+            Assert.HasCount(
                 expected: 2,
-                actual: sessions.Length,
-                message: "Expected two distinct WebDriver sessions to be initiated.");
+                collection: sessions,
+                message: "Expected two distinct WebDriver sessions to be initiated."
+            );
 
             // Assert that the environment's session parameters count is exactly two
-            Assert.AreEqual(
+            Assert.HasCount(
                 expected: 2,
-                actual: response.Environment.SessionParameters.Count,
-                message: "Expected exactly two session parameters to be present.");
+                collection: response.Environment.SessionParameters,
+                message: "Expected exactly two session parameters to be present."
+            );
 
             // Assert that all session parameters have the expected decoded value "Foo Bar"
             Assert.IsTrue(
@@ -126,7 +113,7 @@ namespace G4.IntegrationTests.Suites.Engine
             );
         }
 
-        [TestMethod(displayName: "Verify that the automation driver is correctly retrieved " +
+        [TestMethod(DisplayName = "Verify that the automation driver is correctly retrieved " +
             "and no exceptions occur during GetStateDriver invocation.")]
         public void GetStateDriver()
         {

@@ -13,7 +13,7 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class EncryptionTests
     {
-        [TestMethod(displayName: "Verify basic encryption and decryption.")]
+        [TestMethod(DisplayName = "Verify basic encryption and decryption.")]
         public void EncryptionBasicTest()
         {
             // Constants for encryption
@@ -40,7 +40,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(expected: StringUnderTest, actual: decrypted);
         }
 
-        [TestMethod(displayName: "Verify that parameter value is correctly encrypted, " +
+        [TestMethod(DisplayName = "Verify that parameter value is correctly encrypted, " +
             "encoded, updated, and retrieved when environment is set and parameters are accessed")]
         public void ApplicationEnvironmentTest()
         {
@@ -108,7 +108,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(expected: "Foo Bar", actual: parameter);
         }
 
-        [TestMethod(displayName: "Verify that CryptographicException is thrown when decryption " +
+        [TestMethod(DisplayName = "Verify that CryptographicException is thrown when decryption " +
             "fails due to an incorrect encryption key or improper decoding")]
         public void ApplicationEnvironmentExceptionTest()
         {

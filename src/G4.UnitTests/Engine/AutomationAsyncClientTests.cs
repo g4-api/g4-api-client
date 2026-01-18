@@ -17,7 +17,7 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class AutomationAsyncClientTests : TestBase
     {
-        [TestMethod(displayName: "Verify that active automation is returned and removed from queue " +
+        [TestMethod(DisplayName = "Verify that active automation is returned and removed from queue " +
             "when pending automation is moved to active queue")]
         public void GetActiveAutomationTest()
         {
@@ -36,19 +36,19 @@ namespace G4.UnitTests.Engine
             asyncClient.AddPendingAutomation(automation);
 
             // Assert that exactly three automations are in the pending queue.
-            Assert.AreEqual(expected: 3, actual: pendingQueue.Count);
+            Assert.HasCount(expected: 3, collection: pendingQueue);
 
             // Move the pending automation to the active queue.
             asyncClient.EnablePendingAutomation();
 
             // Assert that the pending queue count decreases to two after retrieving one automation.
-            Assert.AreEqual(expected: 2, actual: pendingQueue.Count);
+            Assert.HasCount(expected: 2, collection: pendingQueue);
 
             // Retrieve the first active automation from the active queue.
             var activeAutomation = asyncClient.GetActiveAutomation();
 
             // Assert that there is exactly one group in the active queue.
-            Assert.AreEqual(expected: 0, actual: activeQueue.Count);
+            Assert.HasCount(expected: 0, collection: activeQueue);
 
             // Verify that the status of the active automation is 'Processing'.
             Assert.AreEqual(
@@ -56,7 +56,7 @@ namespace G4.UnitTests.Engine
                 actual: activeAutomation.Status.ProgressStatus.Status);
         }
 
-        [TestMethod(displayName: "Verify that a single automation is enqueued when no data is used")]
+        [TestMethod(DisplayName = "Verify that a single automation is enqueued when no data is used")]
         public void QueueNewAutomationTest()
         {
             // Instantiate a new G4Client and retrieve its asynchronous automation client
@@ -73,10 +73,10 @@ namespace G4.UnitTests.Engine
             asyncClient.AddPendingAutomation(automation);
 
             // Assert that exactly one automation has been added to the pending queue
-            Assert.AreEqual(expected: 1, actual: pendingQueue.Count);
+            Assert.HasCount(expected: 1, collection: pendingQueue);
         }
 
-        [TestMethod(displayName: "Verify that multiple automations are enqueued when data is provided")]
+        [TestMethod(DisplayName = "Verify that multiple automations are enqueued when data is provided")]
         public void QueueNewAutomationWithDataTest()
         {
             // Instantiate a new G4Client and retrieve its asynchronous automation client
@@ -93,10 +93,10 @@ namespace G4.UnitTests.Engine
             asyncClient.AddPendingAutomation(automation);
 
             // Assert that exactly three automations (expected based on the provided data) are in the pending queue
-            Assert.AreEqual(expected: 3, actual: pendingQueue.Count);
+            Assert.HasCount(expected: 3, collection: pendingQueue);
         }
 
-        [TestMethod(displayName: "Verify that pending automation is accepted and moved to active " +
+        [TestMethod(DisplayName = "Verify that pending automation is accepted and moved to active " +
             "queue when automation is queued")]
         public void QueueNewActiveAutomationTest()
         {
@@ -115,19 +115,19 @@ namespace G4.UnitTests.Engine
             asyncClient.AddPendingAutomation(automation);
 
             // Assert that exactly three automations are in the pending queue.
-            Assert.AreEqual(expected: 3, actual: pendingQueue.Count);
+            Assert.HasCount(expected: 3, collection: pendingQueue);
 
             // Move the pending automation to the active queue.
             asyncClient.EnablePendingAutomation();
 
             // Assert that the pending queue count decreases to two after retrieving one automation.
-            Assert.AreEqual(expected: 2, actual: pendingQueue.Count);
+            Assert.HasCount(expected: 2, collection: pendingQueue);
 
             // Retrieve the first active automation from the active queue.
             var firstActiveAutomation = activeQueue.Values.FirstOrDefault();
 
             // Assert that there is exactly one group in the active queue.
-            Assert.AreEqual(expected: 1, actual: activeQueue.Count);
+            Assert.HasCount(expected: 1, collection: activeQueue);
 
             // Verify that the status of the active automation is 'Processing'.
             Assert.AreEqual(
@@ -135,7 +135,7 @@ namespace G4.UnitTests.Engine
                 actual: firstActiveAutomation?.Status.ProgressStatus.Status);
         }
 
-        [TestMethod(displayName: "Verify that automation invoked event is raised the expected number " +
+        [TestMethod(DisplayName = "Verify that automation invoked event is raised the expected number " +
             "of times when asynchronous invocation is completed")]
         public void InvokeAsyncTest()
         {

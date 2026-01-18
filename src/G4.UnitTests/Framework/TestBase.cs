@@ -795,10 +795,10 @@ namespace G4.UnitTests.Framework
             }
 
             // Assert that the plugin has a description
-            Assert.IsTrue(attribute.Description?.Any() == true, "Plugin must have a description.");
+            Assert.IsNotEmpty(attribute.Description ?? [], "Plugin must have a description.");
 
             // Assert that the plugin has a summary
-            Assert.IsTrue(attribute.Summary?.Any() == true, "Plugin must have a summary.");
+            Assert.IsNotEmpty(attribute.Summary ?? [], "Plugin must have a summary.");
 
             // If a custom plugin name is provided, check if it matches the plugin's key
             if (pluginName != null)
@@ -831,15 +831,15 @@ namespace G4.UnitTests.Framework
             var webDriver = action.GetType().GetProperty("WebDriver");
 
             // Assert that the plugin object is not the default value (null)
-            Assert.IsTrue(action != default, "Plugin was not generated correctly.");
+            Assert.IsNotNull(action, "Plugin was not generated correctly.");
 
             // Assert that plugin types have been loaded into the cache manager
-            Assert.IsTrue(CacheManager.Types.Count != 0, "Plugin types were not loaded.");
+            Assert.IsNotEmpty(CacheManager.Types, "Plugin types were not loaded.");
 
             // If the action is derived from PluginBase, assert that its WebDriver property is not null
             if (action is PluginBase)
             {
-                Assert.IsTrue(webDriver?.GetValue(action) != null, "Plugin WebDriver was not generated correctly.");
+                Assert.IsNotNull(webDriver?.GetValue(action), "Plugin WebDriver property was not found.");
             }
         }
         #endregion

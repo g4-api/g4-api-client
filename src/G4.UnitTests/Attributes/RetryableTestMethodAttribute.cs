@@ -1,57 +1,47 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace G4.UnitTests.Attributes
 {
     /// <summary>
-    /// A custom test method attribute that allows for retry logic in unit tests.
+    /// Marks a test method as retryable, allowing it to be executed multiple times
+    /// before being considered failed.
     /// </summary>
-    /// <param name="numberOfAttempts">The number of times to attempt the test.</param>
-    /// <param name="displayName">The display name of the test method.</param>
     [AttributeUsage(AttributeTargets.Method)]
-    public class RetryableTestMethodAttribute(int numberOfAttempts, string displayName) : TestMethodAttribute(displayName)
+    public class RetryableTestMethodAttribute(
+        int numberOfAttempts,
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = -1) : TestMethodAttribute(callerFilePath, callerLineNumber)
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="RetryableTestMethodAttribute"/> class with a single attempt.
+        /// Creates a retryable test attribute with a default of 1 attempt.
         /// </summary>
-        public RetryableTestMethodAttribute()
-            : this(numberOfAttempts: 1, displayName: null)
+        /// <param name="callerFilePath">Automatically populated with the source file path of the calling method.</param>
+        /// <param name="callerLineNumber">Automatically populated with the source line number of the calling method.</param>
+        public RetryableTestMethodAttribute(
+            [CallerFilePath] string callerFilePath = "",
+            [CallerLineNumber] int callerLineNumber = -1)
+            : this(numberOfAttempts: 1, callerFilePath, callerLineNumber)
         { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="RetryableTestMethodAttribute"/> class with a specified number of attempts.
+        /// Gets or sets the delay (in milliseconds) between retry attempts.
         /// </summary>
-        /// <param name="numberOfAttempts">The number of times to attempt the test.</param>
-        public RetryableTestMethodAttribute(int numberOfAttempts)
-            : this(numberOfAttempts, displayName: null)
-        { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="RetryableTestMethodAttribute"/> class with a specified display name.
-        /// </summary>
-        /// <param name="displayName">The display name of the test method.</param>
-        public RetryableTestMethodAttribute(string displayName)
-            : this(numberOfAttempts: 1, displayName)
-        { }
-
-        /// <summary>
-        /// Gets or sets the delay between test attempts in milliseconds.
-        /// </summary>
+        /// <remarks>This delay is applied after a failed attempt and before retrying. Default is 1000 ms (1 second).</remarks>
         public int DelayBetweenAttempts { get; set; } = 1000;
 
         /// <summary>
-        /// Gets the number of times the test will be attempted.
+        /// Gets the total number of attempts allowed for this test method.
         /// </summary>
+        /// <remarks>This includes the initial attempt. For example, a value of 3 means: 1 initial run + 2 retries.</remarks>
         public int NumberOfAttempts { get; } = numberOfAttempts;
 
-        /// <summary>
-        /// Executes the test method, retrying up to <see cref="NumberOfAttempts"/> times if it fails.
-        /// </summary>
-        /// <param name="testMethod">The test method to be executed.</param>
-        /// <returns>An array of <see cref="TestResult"/> objects representing the outcome of each test attempt.</returns>
-        public override TestResult[] Execute(ITestMethod testMethod)
+        /// <inheritdoc />
+        public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
         {
             // Array to hold the results of each test attempt
             TestResult[] results = [];
@@ -63,7 +53,7 @@ namespace G4.UnitTests.Attributes
                 try
                 {
                     // Execute the test method
-                    results = base.Execute(testMethod);
+                    results = await base.ExecuteAsync(testMethod);
 
                     // If all test results are successful, return the results
                     if (Array.TrueForAll(results, r => r.Outcome == UnitTestOutcome.Passed))

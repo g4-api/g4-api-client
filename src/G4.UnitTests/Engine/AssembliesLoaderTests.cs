@@ -13,7 +13,7 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class AssembliesLoaderTests
     {
-        [TestMethod(displayName: "Verify that the number of imported assemblies and types " +
+        [TestMethod(DisplayName = "Verify that the number of imported assemblies and types " +
             "meets certain criteria.")]
         public void AssembliesNumberTest()
         {
@@ -24,16 +24,16 @@ namespace G4.UnitTests.Engine
             var actual = loader.ImportAssemblies();
 
             // Assert that the count of imported assemblies is not zero
-            Assert.IsTrue(actual.Count != 0);
+            Assert.IsNotEmpty(actual);
 
             // Assert that the count of unique assemblies is greater than 5
-            Assert.IsTrue(actual.Select(i => i.Value.Assembly).Count() > 5);
+            Assert.IsGreaterThan(5, actual.Select(i => i.Value.Assembly).Count());
 
             // Assert that the total count of types across all assemblies is greater than 50
-            Assert.IsTrue(actual.Sum(i => i.Value.Types.Count()) > 50);
+            Assert.IsGreaterThan(50, actual.Sum(i => i.Value.Types.Count()));
         }
 
-        [TestMethod(displayName: "Verify that the SetupCompleted event is raised with the " +
+        [TestMethod(DisplayName = "Verify that the SetupCompleted event is raised with the " +
             "correct event arguments after importing assemblies.")]
         public void SetupCompletedEventTest()
         {
@@ -51,8 +51,8 @@ namespace G4.UnitTests.Engine
 
             // Assert that the event arguments contain information about loaded files, directories, and the base directory
             Assert.IsTrue(actual.Files.Any());
-            Assert.IsTrue(!actual.Directories.Any());
-            Assert.IsTrue(!string.IsNullOrEmpty(actual.Directory));
+            Assert.IsFalse(actual.Directories.Any());
+            Assert.IsFalse(string.IsNullOrEmpty(actual.Directory));
         }
     }
 }

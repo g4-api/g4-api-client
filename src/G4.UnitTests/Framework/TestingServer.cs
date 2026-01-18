@@ -3,7 +3,6 @@ using G4.Attributes;
 using G4.Extensions;
 using G4.Models;
 
-using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +14,6 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Net.Mime;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -1408,7 +1406,7 @@ namespace G4.UnitTests.Framework
     public static class WebServer
     {
         // Static variable to hold the web host instance.
-        private static IWebHost s_webHost = NewWebHost(port: 9002, shutdownTimeout: TimeSpan.FromSeconds(60));
+        private static IHost s_webHost = NewWebHost(port: 9002, shutdownTimeout: TimeSpan.FromSeconds(60));
 
         /// <summary>
         /// Starts the web host asynchronously.
@@ -1422,14 +1420,16 @@ namespace G4.UnitTests.Framework
             => s_webHost = NewWebHost(port: 9002, shutdownTimeout: TimeSpan.FromSeconds(60));
 
         // Creates a new web host with the specified port and shutdown timeout.
-        private static IWebHost NewWebHost(int port, TimeSpan shutdownTimeout)
+        private static IHost NewWebHost(int port, TimeSpan shutdownTimeout)
         {
-            return WebHost
+            return Host
                 .CreateDefaultBuilder()
-                .UseUrls()
-                .ConfigureKestrel(i => i.Listen(IPAddress.Any, port))
-                .UseStartup<Startup>()
-                .UseShutdownTimeout(shutdownTimeout)
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseKestrel(options => options.ListenAnyIP(port));
+                    webBuilder.UseStartup<Startup>();
+                    webBuilder.UseShutdownTimeout(shutdownTimeout);
+                })
                 .Build();
         }
 

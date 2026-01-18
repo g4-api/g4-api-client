@@ -45,7 +45,7 @@ namespace G4.IntegrationTests.Framework
             WebServer.StartWebHost();  // Start the web host
 
             // Start BrowserStack local agent if the grid endpoint contains "browserstack"
-            var remoteEndpoint = context.Properties.Contains(key: "Grid.Endpoint")
+            var remoteEndpoint = context.Properties.ContainsKey(key: "Grid.Endpoint")
                 ? $"{context.Properties["Grid.Endpoint"]}"
                 : string.Empty;
 
