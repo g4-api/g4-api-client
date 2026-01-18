@@ -23,7 +23,7 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class G4ClientTests : TestBase
     {
-        [TestMethod("Verify that parameters are correctly applied in the template rules")]
+        [TestMethod(DisplayName = "Verify that parameters are correctly applied in the template rules")]
         public void TemplateTest()
         {
             // Read the JSON template file and remove any extra whitespace
@@ -56,7 +56,7 @@ namespace G4.UnitTests.Engine
             Invoke(ruleJson);
         }
 
-        [TestMethod(displayName: "Verify the data provider when data is provided")]
+        [TestMethod(DisplayName = "Verify the data provider when data is provided")]
         public void DataProviderWithDataTest()
         {
             // Create automation model using test context
@@ -148,7 +148,7 @@ namespace G4.UnitTests.Engine
                 message: "City of data provider 3 does not match.");
         }
 
-        [TestMethod(displayName: "Verify the data provider when data is not provided")]
+        [TestMethod(DisplayName = "Verify the data provider when data is not provided")]
         public void DataProviderWithoutDataTest()
         {
             // Create automation model using test context
@@ -172,7 +172,7 @@ namespace G4.UnitTests.Engine
 
         [RetryableTestMethod(
             numberOfAttempts: 5,
-            displayName: "Verify the count of exceptions in the flat request when data is provided",
+            DisplayName = "Verify the count of exceptions in the flat request when data is provided",
             DelayBetweenAttempts = 3000)]
         public void FlatRequestExceptionCountTest()
         {
@@ -197,7 +197,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(4, flatRequest.Count());
         }
 
-        [TestMethod(displayName: "Verify the count of performance points in the flat request when data is provided")]
+        [TestMethod(DisplayName = "Verify the count of performance points in the flat request when data is provided")]
         public void FlatRequestPerformancePointCountTest()
         {
             // Create automation model using test context
@@ -221,7 +221,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(48, flatRequest.Count());
         }
 
-        [TestMethod(displayName: "Verify the response size of the flat request when data is provided")]
+        [TestMethod(DisplayName = "Verify the response size of the flat request when data is provided")]
         public void FlatRequestResponseSizeTest()
         {
             // Create automation model using test context
@@ -243,10 +243,10 @@ namespace G4.UnitTests.Engine
                 .ResponseSize;
 
             // Assert that the response size is greater than zero
-            Assert.IsTrue(responseSize > 0);
+            Assert.IsGreaterThan(0, responseSize);
         }
 
-        [TestMethod(displayName: "Verify the performance point automation reference details " +
+        [TestMethod(DisplayName = "Verify the performance point automation reference details " +
             "in the flat request when data is provided")]
         public void PerformancePointAutomationReferenceDetailsTest()
         {
@@ -292,7 +292,7 @@ namespace G4.UnitTests.Engine
 
         [RetryableTestMethod(
             numberOfAttempts: 5,
-            displayName: "Verify the performance point details in the flat request when data is provided",
+            DisplayName = "Verify the performance point details in the flat request when data is provided",
             DelayBetweenAttempts = 3000)]
         public void PerformancePointDetailsTest()
         {
@@ -330,29 +330,29 @@ namespace G4.UnitTests.Engine
                 Assert.AreEqual(expected: performancePoint.End.Year, actual: DateTime.UtcNow.Year, "End year must match the current UTC year.");
 
                 // Assert that the run time is greater than zero
-                Assert.IsTrue(condition: performancePoint.RunTime > 0, "Run time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.RunTime, "Run time must be greater than zero.");
 
                 // Assert that the setup delegation time is greater than zero
-                Assert.IsTrue(condition: performancePoint.SetupDelegationTime > 0, "Setup delegation time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.SetupDelegationTime, "Setup delegation time must be greater than zero.");
 
                 // Assert that the setup time is greater than zero
-                Assert.IsTrue(condition: performancePoint.SetupTime > 0, "Setup time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.SetupTime, "Setup time must be greater than zero.");
 
                 // Assert that the teardown delegation time is greater than zero
-                Assert.IsTrue(condition: performancePoint.TeardownDelegationTime > 0, "Teardown delegation time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.TeardownDelegationTime, "Teardown delegation time must be greater than zero.");
 
                 // Assert that the teardown time is greater than zero
-                Assert.IsTrue(condition: performancePoint.TeardownTime > 0, "Teardown time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.TeardownTime, "Teardown time must be greater than zero.");
 
                 // Assert that the reference is not null
                 Assert.IsNotNull(performancePoint.Reference, "Reference must not be null.");
             }
 
             // Assert that the timeouts time is greater than zero
-            Assert.IsTrue(condition: performancePoints.Sum(i => i.Timeouts) > 0, "Timeouts time must be greater than zero.");
+            Assert.IsGreaterThan(0, performancePoints.Sum(i => i.Timeouts), "Timeouts time must be greater than zero.");
         }
 
-        [TestMethod(displayName: "Verify the performance point job reference details in the " +
+        [TestMethod(DisplayName = "Verify the performance point job reference details in the " +
             "flat request when data is provided")]
         public void PerformancePointJobReferenceDetailsTest()
         {
@@ -397,7 +397,7 @@ namespace G4.UnitTests.Engine
             Assert.IsNotNull(value: reference.StageReference, message: "Reference stage reference must not be null.");
         }
 
-        [TestMethod(displayName: "Verify the performance point reference details in the " +
+        [TestMethod(DisplayName = "Verify the performance point reference details in the " +
             "flat request when data is provided")]
         public void PerformancePointReferenceDetailsTest()
         {
@@ -459,7 +459,7 @@ namespace G4.UnitTests.Engine
             Assert.IsNotNull(value: reference.JobReference, message: "Reference job reference must not be null.");
         }
 
-        [TestMethod(displayName: "Verify the performance point stage reference details in " +
+        [TestMethod(DisplayName = "Verify the performance point stage reference details in " +
             "the flat request when data is provided")]
         public void PerformancePointStageReferenceDetailsTest()
         {
@@ -505,7 +505,7 @@ namespace G4.UnitTests.Engine
             Assert.IsTrue(condition: Regex.IsMatch(reference.Id, guidPattern), message: "Reference id must match the default guid format.");
         }
 
-        [TestMethod(displayName: "Verify the request size of the session is greater than " +
+        [TestMethod(DisplayName = "Verify the request size of the session is greater than " +
             "116000 when no data is provided")]
         public void RequestSizeTest()
         {
@@ -522,7 +522,7 @@ namespace G4.UnitTests.Engine
             Assert.IsNotNull(session.RequestSize > 116000);
         }
 
-        [TestMethod(displayName: "Verify the count of sessions in the response when data is provided")]
+        [TestMethod(DisplayName = "Verify the count of sessions in the response when data is provided")]
         public void SessionCountWithDataTest()
         {
             // Create automation model using test context
@@ -538,7 +538,7 @@ namespace G4.UnitTests.Engine
             Assert.IsNotNull(response.Sessions.Count == 3);
         }
 
-        [TestMethod(displayName: "Verify the count of sessions in the response when no data is provided")]
+        [TestMethod(DisplayName = "Verify the count of sessions in the response when no data is provided")]
         public void SessionCountWithoutDataTest()
         {
             // Create automation model without using data
@@ -556,7 +556,7 @@ namespace G4.UnitTests.Engine
 
         [RetryableTestMethod(
             numberOfAttempts: 5,
-            displayName: "Verify the count of exceptions in the sessions when data is provided",
+            DisplayName = "Verify the count of exceptions in the sessions when data is provided",
             DelayBetweenAttempts = 3000)]
         public void SessionExceptionsCountWithDataTest()
         {
@@ -580,7 +580,7 @@ namespace G4.UnitTests.Engine
 
         [RetryableTestMethod(
             numberOfAttempts: 5,
-            displayName: "Verify the count of exceptions in the session when no data is provided",
+            DisplayName = "Verify the count of exceptions in the session when no data is provided",
             DelayBetweenAttempts = 3000)]
         public void SessionExceptionsCountWithoutDataTest()
         {
@@ -597,7 +597,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(4, session.ResponseData.Exceptions.Count());
         }
 
-        [TestMethod(displayName: "Verify the count of performance points in the sessions when data is provided")]
+        [TestMethod(DisplayName = "Verify the count of performance points in the sessions when data is provided")]
         public void SessionPerformancePointCountWithDataTest()
         {
             // Create automation model using test context
@@ -618,7 +618,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(144, performancePoints.Count());
         }
 
-        [TestMethod(displayName: "Verify the count of performance points in the sessions when no data is provided")]
+        [TestMethod(DisplayName = "Verify the count of performance points in the sessions when no data is provided")]
         public void SessionPerformancePointCountWithoutDataTest()
         {
             // Create automation model using test context
@@ -641,7 +641,7 @@ namespace G4.UnitTests.Engine
 
         [RetryableTestMethod(
             numberOfAttempts: 5,
-            displayName: "Verify the performance point details of a session when no data is provided",
+            DisplayName = "Verify the performance point details of a session when no data is provided",
             DelayBetweenAttempts = 3000)]
         public void SessionPerformancePointTest()
         {
@@ -675,26 +675,26 @@ namespace G4.UnitTests.Engine
                 Assert.AreEqual(expected: performancePoint.End.Year, actual: DateTime.UtcNow.Year, "End year must match the current UTC year.");
 
                 // Assert that the run time is greater than zero
-                Assert.IsTrue(condition: performancePoint.RunTime > 0, "Run time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.RunTime, "Run time must be greater than zero.");
 
                 // Assert that the setup delegation time is greater than zero
-                Assert.IsTrue(condition: performancePoint.SetupDelegationTime > 0, "Setup delegation time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.SetupDelegationTime, "Setup delegation time must be greater than zero.");
 
                 // Assert that the setup time is greater than zero
-                Assert.IsTrue(condition: performancePoint.SetupTime > 0, "Setup time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.SetupTime, "Setup time must be greater than zero.");
 
                 // Assert that the teardown delegation time is greater than zero
-                Assert.IsTrue(condition: performancePoint.TeardownDelegationTime > 0, "Teardown delegation time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.TeardownDelegationTime, "Teardown delegation time must be greater than zero.");
 
                 // Assert that the teardown time is greater than zero
-                Assert.IsTrue(condition: performancePoint.TeardownTime > 0, "Teardown time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.TeardownTime, "Teardown time must be greater than zero.");
 
                 // Assert that the timeouts time is greater than zero
-                Assert.IsTrue(condition: performancePoint.Timeouts > 0, "Timeouts time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.Timeouts, "Timeouts time must be greater than zero.");
             }
         }
 
-        [TestMethod(displayName: "Verify the count of jobs in each stage of the structured " +
+        [TestMethod(DisplayName = "Verify the count of jobs in each stage of the structured " +
             "request when data is provided")]
         public void StructuredRequestJobsCountTest()
         {
@@ -724,7 +724,7 @@ namespace G4.UnitTests.Engine
             }
         }
 
-        [TestMethod(displayName: "Verify the response size of the structured request is " +
+        [TestMethod(DisplayName = "Verify the response size of the structured request is " +
             "greater than the flat request when data is provided")]
         public void StructuredRequestResponseSizeTest()
         {
@@ -754,10 +754,10 @@ namespace G4.UnitTests.Engine
                 .ResponseSize;
 
             // Assert that the response size of the structured request is greater than the flat request
-            Assert.IsTrue(structuredResponseSize > flatResponseSize);
+            Assert.IsGreaterThan(flatResponseSize, structuredResponseSize);
         }
 
-        [TestMethod(displayName: "Verify the automation reference details of a stage in the structured request when data is provided")]
+        [TestMethod(DisplayName = "Verify the automation reference details of a stage in the structured request when data is provided")]
         public void StructuredRequestAutomationReferenceDetailsTest()
         {
             // Create automation model using test context
@@ -802,7 +802,7 @@ namespace G4.UnitTests.Engine
             }
         }
 
-        [TestMethod(displayName: "Verify the count of stages in the structured request when data is provided")]
+        [TestMethod(DisplayName = "Verify the count of stages in the structured request when data is provided")]
         public void StructuredRequestStagesCountTest()
         {
             // Create automation model using test context
@@ -828,7 +828,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(4, stages.Count());
         }
 
-        [TestMethod(displayName: "Verify the stage details of a stage in the structured request when data is provided")]
+        [TestMethod(DisplayName = "Verify the stage details of a stage in the structured request when data is provided")]
         public void StructuredRequestStageDetailsTest()
         {
             // Create automation model using test context
@@ -870,7 +870,7 @@ namespace G4.UnitTests.Engine
             }
         }
 
-        [TestMethod(displayName: "Verify the job details of a stage in the structured request when data is provided")]
+        [TestMethod(DisplayName = "Verify the job details of a stage in the structured request when data is provided")]
         public void StructuredRequestStageJobsDetailsTest()
         {
             // Create automation model using test context
@@ -924,7 +924,7 @@ namespace G4.UnitTests.Engine
             }
         }
 
-        [TestMethod(displayName: "Verify the performance point details of a stage in the structured request when data is provided")]
+        [TestMethod(DisplayName = "Verify the performance point details of a stage in the structured request when data is provided")]
         public void StructuredRequestStagePerformancePointTest()
         {
             // Create automation model using test context
@@ -966,26 +966,26 @@ namespace G4.UnitTests.Engine
                 Assert.AreEqual(expected: performancePoint.End.Year, actual: DateTime.UtcNow.Year, "End year must match the current UTC year.");
 
                 // Assert that the run time is greater than zero
-                Assert.IsTrue(condition: performancePoint.RunTime > 0, "Run time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.RunTime, "Run time must be greater than zero.");
 
                 // Assert that the setup delegation time is greater than zero
-                Assert.IsTrue(condition: performancePoint.SetupDelegationTime > 0, "Setup delegation time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.SetupDelegationTime, "Setup delegation time must be greater than zero.");
 
                 // Assert that the setup time is greater than zero
-                Assert.IsTrue(condition: performancePoint.SetupTime > 0, "Setup time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.SetupTime, "Setup time must be greater than zero.");
 
                 // Assert that the teardown delegation time is greater than zero
-                Assert.IsTrue(condition: performancePoint.TeardownDelegationTime > 0, "Teardown delegation time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.TeardownDelegationTime, "Teardown delegation time must be greater than zero.");
 
                 // Assert that the teardown time is greater than zero
-                Assert.IsTrue(condition: performancePoint.TeardownTime > 0, "Teardown time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.TeardownTime, "Teardown time must be greater than zero.");
 
                 // Assert that the timeouts time is greater than zero
-                Assert.IsTrue(condition: performancePoint.Timeouts > 0, "Timeouts time must be greater than zero.");
+                Assert.IsGreaterThan(0, performancePoint.Timeouts, "Timeouts time must be greater than zero.");
             }
         }
 
-        [TestMethod(displayName: "Verify that all automation events are triggered and counted correctly")]
+        [TestMethod(DisplayName = "Verify that all automation events are triggered and counted correctly")]
         public void AutomationEventsTest()
         {
             // Dictionary to track the invocation status and count of various automation events

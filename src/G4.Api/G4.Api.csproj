@@ -2,9 +2,9 @@
 
 	<PropertyGroup>
 		<!-- Assembly -->
-		<TargetFramework>net8.0</TargetFramework>
-		<AssemblyVersion>8.0.0.0</AssemblyVersion>
-		<FileVersion>8.0.0.0</FileVersion>
+		<TargetFramework>net10.0</TargetFramework>
+		<AssemblyVersion>10.0.0.0</AssemblyVersion>
+		<FileVersion>10.0.0.0</FileVersion>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
 		<LangVersion>latest</LangVersion>
@@ -30,9 +30,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="G4.Plugins" Version="2025.3.28.36" />
-		<PackageReference Include="G4.Plugins.Common" Version="2025.3.28.107" />
-		<PackageReference Include="G4.Plugins.Ui" Version="2025.3.28.107" />
+		<PackageReference Include="G4.Plugins" Version="2026.1.18.46" />
+		<PackageReference Include="G4.Plugins.Common" Version="2026.1.18.119" />
+		<PackageReference Include="G4.Plugins.Ui" Version="2026.1.18.119" />
 	</ItemGroup>
 
 </Project>

@@ -11,7 +11,7 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class CliFactoryTests
     {
-        [TestMethod(displayName: "Verify that the conversion of a CLI expression to a " +
+        [TestMethod(DisplayName = "Verify that the conversion of a CLI expression to a " +
             "dictionary of arguments is performed correctly")]
         public void ConvertToDictionaryBasicTest()
         {
@@ -31,11 +31,11 @@ namespace G4.UnitTests.Engine
             var headers = JsonSerializer.Deserialize<string[]>(arguments["header"]);
 
             // Assert that there are two headers and a total of four arguments in the dictionary.
-            Assert.IsTrue(headers.Length == 2);
-            Assert.IsTrue(arguments.Count == 4);
+            Assert.HasCount(expected: 2, collection: headers);
+            Assert.HasCount(expected: 4, collection: arguments);
         }
 
-        [TestMethod(displayName: "Verify that the conversion of a nested CLI expression " +
+        [TestMethod(DisplayName = "Verify that the conversion of a nested CLI expression " +
             "to a dictionary of arguments is performed correctly.")]
         public void ConvertToDictionaryNestedExpressionTest()
         {
@@ -55,7 +55,7 @@ namespace G4.UnitTests.Engine
             Assert.AreEqual(expected, arguments["nested"]);
 
             // Assert that there are a total of three arguments in the dictionary.
-            Assert.IsTrue(arguments.Count == 3);
+            Assert.HasCount(expected: 3, collection: arguments);
         }
     }
 }

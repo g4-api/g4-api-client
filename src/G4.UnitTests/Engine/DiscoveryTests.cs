@@ -17,7 +17,7 @@ namespace G4.UnitTests.Engine
         /// Tests retrieval of test methods and classes based on the specified SQL query.
         /// </summary>
         /// <param name="sqlQuery">The SQL query used to filter the test methods and classes.</param>
-        [TestMethod(displayName: "Verify that test methods and classes are retrieved based on the specified SQL query.")]
+        [TestMethod(DisplayName = "Verify that test methods and classes are retrieved based on the specified SQL query.")]
         [DataRow("Category <> ''")]
         public void GetTestsBySqlQueryTest(string sqlQuery)
         {
@@ -46,7 +46,7 @@ namespace G4.UnitTests.Engine
             var rows = methodRecords.Select(sqlQuery).Concat(classRecords.Select(sqlQuery)).ToArray();
 
             // Assert that there are at least 2 rows matching the SQL query
-            Assert.IsTrue(rows.Length >= 2);
+            Assert.IsGreaterThanOrEqualTo(2, rows.Length);
         }
 
         // Creates a new DataTable containing test records for the specified test methods.
