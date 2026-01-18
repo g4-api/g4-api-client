@@ -13,10 +13,6 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class DiscoveryTests
     {
-        /// <summary>
-        /// Tests retrieval of test methods and classes based on the specified SQL query.
-        /// </summary>
-        /// <param name="sqlQuery">The SQL query used to filter the test methods and classes.</param>
         [TestMethod(DisplayName = "Verify that test methods and classes are retrieved based on the specified SQL query.")]
         [DataRow("Category <> ''")]
         public void GetTestsBySqlQueryTest(string sqlQuery)
