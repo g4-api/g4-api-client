@@ -8,6 +8,8 @@ namespace G4.Api
 {
     /// <summary>
     /// Represents a manager for automation queues within the G4™ framework.
+    /// This interface defines the contract for managing active, pending,
+    /// and error queues of automation tasks, as well as events related to queue operations.
     /// </summary>
     public interface IQueueManager
     {
