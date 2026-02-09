@@ -141,6 +141,13 @@ namespace G4.Api.Abstractions
         /// <param name="queueModels">An array of <see cref="G4QueueModel"/> instances representing automation tasks.</param>
         /// <returns>A dictionary mapping group IDs to their corresponding <see cref="G4AutomationResponseModel"/> responses.</returns>
         IDictionary<string, G4AutomationResponseModel> Invoke(int maxParallel, params G4QueueModel[] queueModels);
+
+        /// <summary>
+        /// Stops the automation process identified by the specified automation ID.
+        /// </summary>
+        /// <param name="automationId">The unique identifier of the automation process to stop. Cannot be null or empty.</param>
+        /// <returns>An integer indicating the result of the operation. A value of 0 indicates success; any other value indicates an error.</returns>
+        public int StopAutomation(string automationId);
         #endregion
     }
 }
