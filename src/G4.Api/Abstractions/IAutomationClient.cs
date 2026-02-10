@@ -42,6 +42,11 @@ namespace G4.Api.Abstractions
         event EventHandler<AutomationEventArgs> AutomationStatusChanged;
 
         /// <summary>
+        /// Occurs when the automation process has stopped, providing the exit code of the operation.
+        /// </summary>
+        event EventHandler<int> AutomationStopped;
+
+        /// <summary>
         /// Occurs after a job has been invoked.
         /// </summary>
         event EventHandler<JobEventArgs> JobInvoked;

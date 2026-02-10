@@ -48,6 +48,9 @@ namespace G4.Api.Clients
         public event EventHandler<AutomationEventArgs> AutomationStatusChanged;
 
         /// <inheritdoc />
+        public event EventHandler<int> AutomationStopped;
+
+        /// <inheritdoc />
         public event EventHandler<JobEventArgs> JobInvoked;
 
         /// <inheritdoc />
@@ -138,6 +141,10 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public int StopAutomation(string automationId)
         {
+            // Initialize the exit code to 0, indicating success by default.
+            // This will be updated to 1 if any errors occur during the stop process.
+            var exitCode = 0;
+
             try
             {
                 // Attempt to retrieve the CancellationTokenSource associated with the automation ID
@@ -184,16 +191,20 @@ namespace G4.Api.Clients
                         driver?.Dispose();
                     }
                 }
-
-                // Signal successful termination
-                return 0;
             }
             catch
             {
                 // Any failure (lookup, driver close, dispose, etc.)
                 // results in a non-zero exit code
-                return 1;
+                exitCode = 1;
             }
+            finally
+            {
+                AutomationStopped?.Invoke(sender: this, e: exitCode);
+            }
+
+            // Return the exit code indicating the result of the stop operation
+            return exitCode;
         }
 
         // Invokes automation tasks based on the provided array of queue models with a specified maximum degree of parallelism.
