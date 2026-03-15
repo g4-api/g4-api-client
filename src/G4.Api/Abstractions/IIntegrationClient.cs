@@ -1,5 +1,6 @@
 ﻿using G4.Attributes.Abstraction;
 using G4.Cache;
+using G4.Credentials.Models;
 using G4.Models;
 
 using System.Collections.Concurrent;
@@ -26,6 +27,19 @@ namespace G4.Api.Abstractions
         /// </summary>
         /// <returns>A dictionary where the keys are plugin types and the values are dictionaries containing plugin cache models.</returns>
         IDictionary<string, ConcurrentDictionary<string, G4PluginCacheModel>> GetCache();
+
+        /// <summary>
+        /// Retrieves a single <see cref="OAuthCredentialModel"/> by its identifier or name.
+        /// </summary>
+        /// <param name="idOrName">The unique identifier or logical name of the credential.</param>
+        /// <returns>The matching <see cref="OAuthCredentialModel"/>.</returns>
+        OAuthCredentialModel GetCredentials(string idOrName);
+
+        /// <summary>
+        /// Retrieves all stored <see cref="OAuthCredentialModel"/> entries.
+        /// </summary>
+        /// <returns>A dictionary where the keys are credential identifiers and names, and the values are the corresponding <see cref="OAuthCredentialModel"/> instances.</returns>
+        IDictionary<string, OAuthCredentialModel> GetCredentials();
 
         /// <summary>
         /// Retrieves the document associated with the specified key. If the document is not found in the cache,
