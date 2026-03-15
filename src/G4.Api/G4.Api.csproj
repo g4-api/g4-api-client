@@ -30,9 +30,20 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="G4.Plugins" Version="2026.2.9.47" />
+		<!--
+		<PackageReference Include="G4.Cache" Version="2026.3.9.57" />
+		-->
+		<PackageReference Include="G4.CredentialsManager" Version="2026.3.9.57" />
+		<!--
+		<PackageReference Include="G4.Plugins" Version="2026.3.9.57" />
+		-->
 		<PackageReference Include="G4.Plugins.Common" Version="2026.1.20.120" />
 		<PackageReference Include="G4.Plugins.Ui" Version="2026.1.20.120" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\..\g4-engine\src\G4.Cache\G4.Cache.csproj" />
+	  <ProjectReference Include="..\..\..\g4-engine\src\G4.Plugins\G4.Plugins.csproj" />
 	</ItemGroup>
 
 </Project>
