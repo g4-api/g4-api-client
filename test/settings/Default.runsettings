@@ -7,7 +7,7 @@
 		<Parameter name="BrowserStack.Password" value="" />
 
 		<!-- Settings -->
-		<Parameter name="G4.Username" value="pyhBifB6z1YxJv53xLip" />
+		<Parameter name="G4.Username" value="" />
 		<Parameter name="Integration" value="BrowserStack" />
 		<Parameter name="Integration.ApplicationUnderTest" value="http://localhost:9002/test/static/" />
 		<Parameter name="Integration.Selenium.Version" value ="4.8.0" />
