@@ -2,6 +2,8 @@
 using G4.Attributes;
 using G4.Attributes.Abstraction;
 using G4.Cache;
+using G4.Credentials;
+using G4.Credentials.Models;
 using G4.Extensions;
 using G4.Models;
 
@@ -23,6 +25,9 @@ namespace G4.Api.Clients
         #region *** Fields       ***
         // Manages caching mechanisms for plugins.
         private readonly CacheManager _cache;
+
+        // Manages credentials for external integrations.
+        private readonly CredentialsManager _credentials;
 
         // Represents the internal cache for non-cached plugins.
         // This cache is used to store plugins that are not present in the main cache.
@@ -70,6 +75,9 @@ namespace G4.Api.Clients
             // Assign the provided cache to the internal cache field.
             _cache = cache;
 
+            // Initialize the credentials manager using a connection from the CacheManager.
+            _credentials = new CredentialsManager(CacheManager.SqliteConnection);
+
             // Merge driver data or other plugin data from the internal cache into the user-provided cache.
             foreach (var item in InternalCache)
             {
@@ -93,6 +101,23 @@ namespace G4.Api.Clients
         public IDictionary<string, ConcurrentDictionary<string, G4PluginCacheModel>> GetCache()
         {
             return _cache.PluginsCache;
+        }
+
+        /// <inheritdoc />
+        public OAuthCredentialModel GetCredentials(string idOrName)
+        {
+            const StringComparison comparison = StringComparison.OrdinalIgnoreCase;
+
+            return _cache
+                .CredentialsCache
+                .Values
+                .FirstOrDefault(i => i.Id.Equals(idOrName, comparison) || i.Name.Equals(idOrName, comparison));
+        }
+
+        /// <inheritdoc />
+        public IDictionary<string, OAuthCredentialModel> GetCredentials()
+        {
+            return _cache.CredentialsCache;
         }
 
         /// <inheritdoc />
@@ -311,6 +336,24 @@ namespace G4.Api.Clients
                 foreach (var plugin in item.Value)
                 {
                     // Update or add the plugin to the cache under the corresponding plugin type and key.
+                    cache.PluginsCache[item.Key][plugin.Key] = plugin.Value;
+                }
+            }
+        }
+
+        /// <inheritdoc />
+        public void SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers)
+        {
+            // Ensure the server collection is always initialized before attempting synchronization.
+            servers ??= new Dictionary<string, McpServerModel>();
+
+            // Retrieve all MCP plugins from the configured servers, grouped by plugin type.
+            foreach (var item in servers.GetModelContextPlugins())
+            {
+                // Iterate through each plugin in the current plugin type group.
+                foreach (var plugin in item.Value)
+                {
+                    // Add or overwrite the plugin entry in the cache using the plugin type and plugin key.
                     cache.PluginsCache[item.Key][plugin.Key] = plugin.Value;
                 }
             }

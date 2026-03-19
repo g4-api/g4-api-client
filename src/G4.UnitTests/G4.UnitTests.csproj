@@ -11,7 +11,7 @@
 		<LangVersion>latest</LangVersion>
 
 		<!-- https://learn.microsoft.com/en-us/dotnet/fundamentals/syslib-diagnostics/syslib1040-1049 -->
-		<NoWarn>$(NoWarn);SYSLIB1045,S4144;MSTEST0016;MSTEST0001</NoWarn>
+		<NoWarn>$(NoWarn);SYSLIB1045,S4144;MSTEST0016;MSTEST0001;CA1873</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -32,16 +32,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.MiddlewareAnalysis" Version="10.0.2" PrivateAssets="all" />
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+		<PackageReference Include="Microsoft.AspNetCore.MiddlewareAnalysis" Version="10.0.5" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
 		<PackageReference Include="MSTest.TestAdapter" Version="4.1.0" />
 		<PackageReference Include="MSTest.TestFramework" Version="4.1.0" />
-		<PackageReference Include="coverlet.collector" Version="6.0.4">
+		<PackageReference Include="coverlet.collector" Version="8.0.1">
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.2" />
-		<PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.2" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.5" />
+		<PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
 	</ItemGroup>
 
 	<ItemGroup>

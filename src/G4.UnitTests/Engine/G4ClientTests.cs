@@ -2,6 +2,7 @@
 using G4.Attributes;
 using G4.Extensions;
 using G4.Models;
+using G4.Plugins.Framework;
 using G4.Plugins.Ui.Actions;
 using G4.UnitTests.Attributes;
 using G4.UnitTests.Framework;
@@ -244,6 +245,58 @@ namespace G4.UnitTests.Engine
 
             // Assert that the response size is greater than zero
             Assert.IsGreaterThan(0, responseSize);
+        }
+
+        [TestMethod(DisplayName = "Verify that an external action rule is correctly invoked and that " +
+            "the response contains a session.")]
+        public void InvokeExternalActionTest()
+        {
+            // Define the action rule to be invoked.
+            var ruleJson = new ActionRuleModel
+            {
+                PluginName = "ExternalTestAction",
+                OnElement = "//positive"
+            };
+
+            // Define the driver parameters.
+            var driverParameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["driver"] = "SimulatorDriver",
+                ["driverBinaries"] = "."
+            };
+
+            // Define the external repository.
+            var repository = new G4ExternalRepositoryModel
+            {
+                Url = "http://localhost:9002",
+                Version = 1,
+                Capabilities = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            };
+
+            // Set up the automation environment and configuration.
+            Automation.NewStage([ruleJson]);
+            Automation.DriverParameters = driverParameters;
+            Automation.Settings.PluginsSettings.ExternalRepositories = [repository];
+
+            // Create an automation client to invoke the actions and get the response.
+            var client = new G4Client();
+            var response = client.Automation.Invoke(Automation);
+
+            // Assert that the response contains a session.
+            Assert.AreNotEqual(default, response.First().Value.Sessions.FirstOrDefault().Value);
+        }
+
+        [TestMethod]
+        public void NewCredentialsTest()
+        {
+            // Create a new G4Client instance
+            var client = new G4Client().Credentials;
+            
+            // Create new credentials using the client and assert that the credentials are not null
+            var credentials = client.NewCredentials(null);
+
+            // Assert that the credentials are not null
+            Assert.IsNotNull(credentials, "Credentials must not be null.");
         }
 
         [TestMethod(DisplayName = "Verify the performance point automation reference details " +
@@ -1081,6 +1134,74 @@ namespace G4.UnitTests.Engine
 
             // Assert that all events have been invoked and their invocation count is greater than zero
             Assert.IsTrue(events.Values.All(i => i.Invoked && i.Count > 0));
+        }
+
+        [Ignore(IgnoreMessage = "This test is ignored because it requires a running MCP server.")]
+        [TestMethod(DisplayName = "Verifies that a Model Context Protocol (MCP) action rule is invoked successfully, " +
+            "and that both the raw response and structured content are stored in session parameters " +
+            "without producing execution exceptions.")]
+        public void InvokeModelContextActionTest()
+        {
+            // Define the MCP action rule to invoke.
+            // The rule targets the "ping" plugin and passes a message argument.
+            var ruleJson = new ActionRuleModel
+            {
+                PluginName = "ping",
+                Argument = "{{$ --message:Foo Bar}}",
+            };
+
+            // Define the driver configuration required by the automation runtime.
+            var driverParameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["driver"] = "SimulatorDriver",
+                ["driverBinaries"] = "."
+            };
+
+            // Define the target MCP server that exposes the external action.
+            var repository = new McpServerModel
+            {
+                Url = "http://localhost:9002/mcp"
+            };
+
+            // Configure the automation with a single stage containing the test rule.
+            Automation.NewStage([ruleJson]);
+
+            // Apply the driver settings to the automation environment.
+            Automation.DriverParameters = driverParameters;
+
+            // Register the MCP server in the plugin settings so the action can be resolved and invoked.
+            Automation.Settings.PluginsSettings.Servers = new Dictionary<string, McpServerModel>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Atlassian"] = new() { Url = "http://localhost:9000/mcp" },
+                ["Mock"] = repository
+            };
+
+            // Create the automation client and invoke the configured automation flow.
+            var client = new G4Client();
+            var response = client.Automation.Invoke(Automation);
+
+            // Read the first returned session from the automation response.
+            var session = response
+                .First()
+                .Value
+                .Sessions
+                .First()
+                .Value;
+
+            // Extract the session parameters populated during plugin execution.
+            var @namespace = nameof(ModelContextProtocolPlugin);
+            var sessionParameters = session.Environment.SessionParameters;
+            var mcpResponse = sessionParameters[$"{@namespace}:Response"];
+            var mcpStructuredContent = sessionParameters[$"{@namespace}:StructuredContent"];
+
+            // Verify that the raw MCP response was stored in the session parameters.
+            Assert.IsFalse(string.IsNullOrEmpty($"{mcpResponse}"));
+
+            // Verify that the MCP structured content was also stored in the session parameters.
+            Assert.IsFalse(string.IsNullOrEmpty($"{mcpStructuredContent}"));
+
+            // Verify that the automation execution completed without exceptions.
+            Assert.IsEmpty(session.ResponseData.Exceptions);
         }
 
         // Creates a new automation model with the provided testContext.

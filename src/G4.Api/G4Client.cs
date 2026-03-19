@@ -87,6 +87,11 @@ namespace G4.Api
         public IAutomationAsyncClient AutomationAsync { get; } = new AutomationAsyncClient(logger, queueManager);
 
         /// <summary>
+        /// Gets the client used for managing credentials.
+        /// </summary>
+        public ICredentialsClient Credentials { get; } = new CredentialsClient(CacheManager.SqliteConnection);
+
+        /// <summary>
         /// Gets the environments client responsible for managing different environments within the G4 system.
         /// </summary>
         public IEnvironmentsClient Environments { get; } = new EnvironmentsClient();

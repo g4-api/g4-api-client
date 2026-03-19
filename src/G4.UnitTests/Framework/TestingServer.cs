@@ -5,6 +5,7 @@ using G4.Models;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mime;
@@ -817,8 +819,6 @@ namespace G4.UnitTests.Framework
     /// Controller for handling test-related API requests in an external G4™ repository mock,
     /// facilitating unit testing for an external repository.
     /// </summary>
-    /// <remarks>Initializes a new instance of the <see cref="TestController"/> class.</remarks>
-    /// <param name="logger">Logger instance for logging.</param>
     [ApiController]
     [Route("api/v1/g4")]
     public class TestController(ILogger<TestController> logger) : ControllerBase
@@ -1326,6 +1326,432 @@ namespace G4.UnitTests.Framework
             return Ok(s_plugins);
         }
         #endregion
+    }
+
+    /// <summary>
+    /// Mock Model Context Protocol (MCP) controller used for unit testing.
+    /// </summary>
+    [ApiController]
+    [Route("mcp")]
+    public class MockMcpController : ControllerBase
+    {
+        // In-memory store for MCP sessions, mapping session IDs to their associated state and data.
+        private static readonly ConcurrentDictionary<string, Dictionary<string, object>> _sessions = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Handles HTTP GET requests for the mock MCP endpoint and returns a basic
+        /// server-sent events (SSE) response stream.
+        /// </summary>
+        [HttpGet]
+        public async Task Get()
+        {
+            // Return a successful HTTP status code.
+            Response.StatusCode = 200;
+
+            // Mark the response as a server-sent events stream.
+            Response.ContentType = "text/event-stream";
+
+            // Write a minimal SSE comment line to keep the stream format valid.
+            await Response.WriteAsync(": mock mcp stream\n\n");
+
+            // Flush the response body so the client receives the streamed content immediately.
+            await Response.Body.FlushAsync();
+        }
+
+        /// <summary>
+        /// Handles incoming JSON-RPC POST requests for the mock MCP endpoint.
+        /// </summary>
+        /// <param name="body">The JSON-RPC request body.</param>
+        [HttpPost]
+        public async Task Post([FromBody] JsonElement body)
+        {
+            // Define a constant for case-insensitive string comparisons used in method matching.
+            const StringComparison comparison = StringComparison.OrdinalIgnoreCase;
+
+            // Read the core JSON-RPC fields from the incoming request body.
+            var jsonrpc = ResolveString(body, "jsonrpc") ?? "2.0";
+            var method = ResolveString(body, "method");
+            var id = GetProperty(body, "id");
+
+            // Reject the request when the JSON-RPC method is missing.
+            if (string.IsNullOrWhiteSpace(method))
+            {
+                await WriteError(
+                    Response,
+                    code: -32600,
+                    message: "Bad Request: Missing method"
+                );
+
+                return;
+            }
+
+            // Handle the MCP initialize request before any session validation is required.
+            if (string.Equals(method, "initialize", comparison))
+            {
+                await Initialize(Response, id);
+                return;
+            }
+
+            // Read the MCP session id from the request headers and validate it against the in-memory session store.
+            var sessionIdHeader = Request.Headers["Mcp-Session-Id"].FirstOrDefault();
+            var isSession = _sessions.TryGetValue(sessionIdHeader, out Dictionary<string, object> value);
+            if (string.IsNullOrWhiteSpace(sessionIdHeader) || !isSession)
+            {
+                await WriteError(
+                    Response,
+                    code: -32600,
+                    message: "Bad Request: Missing or invalid session ID"
+                );
+
+                return;
+            }
+
+            // Mark the current session as initialized when the client sends the initialized notification.
+            if (string.Equals(method, "notifications/initialized", comparison))
+            {
+                value["initialized"] = true;
+                Response.StatusCode = 202;
+                return;
+            }
+
+            // Return the mocked tools list for the current session.
+            if (string.Equals(method, "tools/list", comparison))
+            {
+                await WriteToolsList(Response, id);
+                return;
+            }
+
+            // Execute the mocked tool call and return its response payload.
+            if (string.Equals(method, "tools/call", comparison))
+            {
+                await WriteToolCall(Response, body, id);
+                return;
+            }
+
+            // Return a JSON-RPC method-not-found error for unsupported methods.
+            await WriteSse(Response, payload: new
+            {
+                jsonrpc,
+                id = ResolveId(id),
+                error = new
+                {
+                    code = -32601,
+                    message = $"Method '{method}' not found"
+                }
+            });
+        }
+
+        // Retrieves the specified property from a JSON object.
+        private static JsonElement? GetProperty(JsonElement element, string propertyName)
+        {
+            // Return null when the input element is not an object
+            // or when the requested property does not exist.
+            if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value))
+            {
+                return null;
+            }
+
+            // Return the resolved JSON property value.
+            return value;
+        }
+
+        // Initializes a new mock MCP session, stores its initial state, and writes the
+        // initialize response to the current server-sent events stream.
+        private static Task Initialize(HttpResponse response, JsonElement? id)
+        {
+            // Create a new unique session identifier for the incoming MCP client.
+            var sessionId = Guid.NewGuid().ToString("N");
+
+            // Store the initial session state in the in-memory session dictionary.
+            _sessions[sessionId] = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["initialized"] = false
+            };
+
+            // Return the newly created session id in the MCP session response header.
+            response.Headers["Mcp-Session-Id"] = sessionId;
+
+            // Write the mocked initialize result as an SSE JSON-RPC response payload.
+            return WriteSse(response, payload: new
+            {
+                jsonrpc = "2.0",
+                id = ResolveId(id),
+                result = new
+                {
+                    protocolVersion = "2025-03-26",
+                    capabilities = new
+                    {
+                        tools = new
+                        {
+                            listChanged = false
+                        }
+                    },
+                    serverInfo = new
+                    {
+                        name = "mock-mcp-server",
+                        version = "1.0.0"
+                    }
+                }
+            });
+        }
+
+        // Resolves the specified property value from a JSON object and returns it as a double.
+        private static double ResolveDouble(JsonElement element, string propertyName)
+        {
+            // Return zero when the input element is not an object
+            // or when the requested property does not exist.
+            if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value))
+            {
+                return 0;
+            }
+
+            // Return the numeric value directly when the JSON property is already a number.
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var doubleOut))
+            {
+                return doubleOut;
+            }
+
+            // Try to parse the value when the JSON property is stored as a string.
+            if (value.ValueKind == JsonValueKind.String && double.TryParse(value.GetString(), out var stringOut))
+            {
+                return stringOut;
+            }
+
+            // Return zero when the value cannot be converted to a double.
+            return 0;
+        }
+
+        // Resolves a JSON-RPC identifier value into a CLR object.
+        private static object ResolveId(JsonElement? id)
+        {
+            // Return null when the request does not contain an id value.
+            if (!id.HasValue)
+            {
+                return null;
+            }
+
+            // Convert the JSON id value into the closest matching CLR representation.
+            return id.Value.ValueKind switch
+            {
+                JsonValueKind.String => id.Value.GetString(),
+                JsonValueKind.Number when id.Value.TryGetInt64(out var l) => l,
+                JsonValueKind.Number => id.Value.GetDouble(),
+                _ => id.Value.GetRawText()
+            };
+        }
+
+        // Resolves the specified property value from a JSON object and returns it as a string.
+        private static string ResolveString(JsonElement element, string propertyName)
+        {
+            // Return null when the input element is not an object
+            // or when the requested property does not exist.
+            if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value))
+            {
+                return null;
+            }
+
+            // Convert supported JSON value kinds into their string representation.
+            return value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString(),
+                JsonValueKind.Number => value.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => value.GetRawText()
+            };
+        }
+
+        // Writes a JSON-RPC error response to the HTTP response as a server-sent events (SSE) message.
+        private static Task WriteError(HttpResponse response, int code, string message)
+        {
+            // Write the JSON-RPC error payload to the response as an SSE message.
+            return WriteSse(response, payload: new
+            {
+                jsonrpc = "2.0",
+                id = "server-error",
+                error = new
+                {
+                    code,
+                    message
+                }
+            });
+        }
+
+        // Handles a mock MCP tool invocation request and writes the corresponding JSON-RPC
+        // response to the HTTP response as a server-sent events message.
+        private static Task WriteToolCall(HttpResponse response, JsonElement body, JsonElement? id)
+        {
+            // Resolve the params object from the incoming JSON-RPC request body.
+            var paramsElement = GetProperty(body, "params");
+
+            // Read the tool name and arguments payload from the params object when present.
+            var toolName = paramsElement.HasValue ? ResolveString(paramsElement.Value, "name") : null;
+            var arguments = paramsElement.HasValue ? GetProperty(paramsElement.Value, "arguments") : null;
+
+            // Return a JSON-RPC validation error when the tool name is missing.
+            if (string.IsNullOrWhiteSpace(toolName))
+            {
+                return WriteSse(response, payload: new
+                {
+                    jsonrpc = "2.0",
+                    id = ResolveId(id),
+                    error = new
+                    {
+                        code = -32602,
+                        message = "Invalid params: Missing tool name"
+                    }
+                });
+            }
+
+            // Handle the mock "ping" tool by echoing the provided message
+            // or defaulting to "pong" when no message was supplied.
+            if (string.Equals(toolName, "ping", StringComparison.OrdinalIgnoreCase))
+            {
+                var message = arguments.HasValue
+                    ? ResolveString(arguments.Value, "message") ?? "pong"
+                    : "pong";
+
+                return WriteSse(response, payload: new
+                {
+                    jsonrpc = "2.0",
+                    id = ResolveId(id),
+                    result = new
+                    {
+                        content = new object[]
+                        {
+                            new
+                            {
+                                type = "text",
+                                text = $"mock-ping-response: {message}"
+                            }
+                        },
+                        structuredContent = new
+                        {
+                            tool = "ping",
+                            echoedMessage = message,
+                            ok = true
+                        }
+                    }
+                });
+            }
+
+            // Handle the mock "sum" tool by reading numeric inputs and returning their sum.
+            if (string.Equals(toolName, "sum", StringComparison.OrdinalIgnoreCase))
+            {
+                var a = arguments.HasValue ? ResolveDouble(arguments.Value, "a") : 0;
+                var b = arguments.HasValue ? ResolveDouble(arguments.Value, "b") : 0;
+                var result = a + b;
+
+                return WriteSse(response, payload: new
+                {
+                    jsonrpc = "2.0",
+                    id = ResolveId(id),
+                    result = new
+                    {
+                        content = new object[]
+                        {
+                            new
+                            {
+                                type = "text",
+                                text = $"mock-sum-response: {result}"
+                            }
+                        },
+                        structuredContent = new
+                        {
+                            tool = "sum",
+                            a,
+                            b,
+                            value = result,
+                            ok = true
+                        }
+                    }
+                });
+            }
+
+            // Return a JSON-RPC method-not-found error when the requested tool does not exist.
+            return WriteSse(response, payload: new
+            {
+                jsonrpc = "2.0",
+                id = ResolveId(id),
+                error = new
+                {
+                    code = -32601,
+                    message = $"Tool '{toolName}' not found"
+                }
+            });
+        }
+
+        // Writes the mock tools list response to the HTTP response as a server-sent events message.
+        private static Task WriteToolsList(HttpResponse response, JsonElement? id)
+        {
+            // Define a mocked list of tools to return in the tools/list response.
+            var tools = new object[]
+            {
+                // Mock ping tool definition.
+                new
+                {
+                    name = "ping",
+                    description = "Mock ping tool",
+                    inputSchema = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            message = new
+                            {
+                                type = "string"
+                            }
+                        }
+                    }
+                },
+
+                // Mock sum tool definition.
+                new
+                {
+                    name = "sum",
+                    description = "Mock sum tool",
+                    inputSchema = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            a = new { type = "number" },
+                            b = new { type = "number" }
+                        }
+                    }
+                }
+            };
+
+            // Write the mocked tools/list response as a JSON-RPC payload over SSE.
+            return WriteSse(response, new
+            {
+                jsonrpc = "2.0",
+                id = ResolveId(id),
+                result = new
+                {
+                    tools
+                }
+            });
+        }
+
+        // Writes the specified payload to the HTTP response as a server-sent events (SSE) message.
+        private static async Task WriteSse(HttpResponse response, object payload)
+        {
+            // Return a successful HTTP status code.
+            response.StatusCode = 200;
+
+            // Mark the response content as a server-sent events stream.
+            response.ContentType = "text/event-stream";
+
+            // Serialize the payload to JSON before writing it to the response stream.
+            var json = JsonSerializer.Serialize(payload);
+
+            // Write the JSON payload as an SSE "data:" event entry.
+            await response.WriteAsync($"data: {json}\n\n");
+
+            // Flush the response body so the client receives the event immediately.
+            await response.Body.FlushAsync();
+        }
     }
 
     /// <summary>

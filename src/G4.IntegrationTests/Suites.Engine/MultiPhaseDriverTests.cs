@@ -1,11 +1,15 @@
-﻿using G4.Extensions;
+﻿using G4.Api;
+using G4.Extensions;
 using G4.IntegrationTests.Engine;
 using G4.IntegrationTests.Extensions;
 using G4.IntegrationTests.Framework;
+using G4.Models;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace G4.IntegrationTests.Suites.Engine
 {
@@ -15,6 +19,13 @@ namespace G4.IntegrationTests.Suites.Engine
     [TestCategory("Engine")]
     public class MultiPhaseDriverTests : TestBase
     {
+        [AssemblyInitialize]
+        public static void AssemblyInit(TestContext context)
+        {
+            // extract test run id
+            context.Properties["TestRunId"] = context.Properties["TestRunDirectory"].ToString().Split('\\').Last();
+        }
+
         [TestMethod(DisplayName = "Verify that two WebDriver instances are initiated when a " +
             "job takes the driver from its parent stage.")]
         #region *** Data Set ***

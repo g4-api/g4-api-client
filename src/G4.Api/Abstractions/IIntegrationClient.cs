@@ -1,5 +1,6 @@
 ﻿using G4.Attributes.Abstraction;
 using G4.Cache;
+using G4.Credentials.Models;
 using G4.Models;
 
 using System.Collections.Concurrent;
@@ -26,6 +27,19 @@ namespace G4.Api.Abstractions
         /// </summary>
         /// <returns>A dictionary where the keys are plugin types and the values are dictionaries containing plugin cache models.</returns>
         IDictionary<string, ConcurrentDictionary<string, G4PluginCacheModel>> GetCache();
+
+        /// <summary>
+        /// Retrieves a single <see cref="OAuthCredentialModel"/> by its identifier or name.
+        /// </summary>
+        /// <param name="idOrName">The unique identifier or logical name of the credential.</param>
+        /// <returns>The matching <see cref="OAuthCredentialModel"/>.</returns>
+        OAuthCredentialModel GetCredentials(string idOrName);
+
+        /// <summary>
+        /// Retrieves all stored <see cref="OAuthCredentialModel"/> entries.
+        /// </summary>
+        /// <returns>A dictionary where the keys are credential identifiers and names, and the values are the corresponding <see cref="OAuthCredentialModel"/> instances.</returns>
+        IDictionary<string, OAuthCredentialModel> GetCredentials();
 
         /// <summary>
         /// Retrieves the document associated with the specified key. If the document is not found in the cache,
@@ -131,6 +145,13 @@ namespace G4.Api.Abstractions
         /// <param name="cache">The <see cref="CacheManager"/> instance that will either be updated or serve as the source of new cache data.</param>
         /// <param name="repositories">An array of external repository models that may be used to generate new cache data if necessary.</param>
         void SyncCache(CacheManager cache, params G4ExternalRepositoryModel[] repositories);
+
+        /// <summary>
+        /// Synchronizes Model Context Protocol (MCP) plugins from the specified servers into the cache.
+        /// </summary>
+        /// <param name="cache">The cache manager that will receive the synchronized plugin entries.</param>
+        /// <param name="servers">The MCP servers whose plugins should be retrieved and merged into the cache.</param>
+        void SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers);
 
         /// <summary>
         /// Synchronizes the provided <paramref name="cache"/> instance by either updating it with default data or using it as the source of truth to sync other caches.
