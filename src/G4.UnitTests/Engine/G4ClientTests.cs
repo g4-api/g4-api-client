@@ -1171,7 +1171,8 @@ namespace G4.UnitTests.Engine
             // Register the MCP server in the plugin settings so the action can be resolved and invoked.
             Automation.Settings.PluginsSettings.Servers = new Dictionary<string, McpServerModel>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Atlassian"] = repository
+                ["Atlassian"] = new() { Url = "http://localhost:9000/mcp" },
+                ["Mock"] = repository
             };
 
             // Create the automation client and invoke the configured automation flow.

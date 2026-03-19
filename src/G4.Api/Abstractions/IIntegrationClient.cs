@@ -147,6 +147,13 @@ namespace G4.Api.Abstractions
         void SyncCache(CacheManager cache, params G4ExternalRepositoryModel[] repositories);
 
         /// <summary>
+        /// Synchronizes Model Context Protocol (MCP) plugins from the specified servers into the cache.
+        /// </summary>
+        /// <param name="cache">The cache manager that will receive the synchronized plugin entries.</param>
+        /// <param name="servers">The MCP servers whose plugins should be retrieved and merged into the cache.</param>
+        void SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers);
+
+        /// <summary>
         /// Synchronizes the provided <paramref name="cache"/> instance by either updating it with default data or using it as the source of truth to sync other caches.
         /// Depending on the context, the <paramref name="cache"/> can either hold the default cache data to sync from or be the instance that needs to be updated.
         /// </summary>

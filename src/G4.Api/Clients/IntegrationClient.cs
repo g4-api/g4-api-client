@@ -341,6 +341,24 @@ namespace G4.Api.Clients
             }
         }
 
+        /// <inheritdoc />
+        public void SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers)
+        {
+            // Ensure the server collection is always initialized before attempting synchronization.
+            servers ??= new Dictionary<string, McpServerModel>();
+
+            // Retrieve all MCP plugins from the configured servers, grouped by plugin type.
+            foreach (var item in servers.GetModelContextPlugins())
+            {
+                // Iterate through each plugin in the current plugin type group.
+                foreach (var plugin in item.Value)
+                {
+                    // Add or overwrite the plugin entry in the cache using the plugin type and plugin key.
+                    cache.PluginsCache[item.Key][plugin.Key] = plugin.Value;
+                }
+            }
+        }
+
         // Scans all cached types for those decorated with G4DriverPluginAttribute and aggregates them
         // into a key-value pair representing driver data.
         private static ConcurrentDictionary<string, G4PluginCacheModel> FindDrivers()
