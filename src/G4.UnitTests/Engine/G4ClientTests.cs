@@ -1136,6 +1136,7 @@ namespace G4.UnitTests.Engine
             Assert.IsTrue(events.Values.All(i => i.Invoked && i.Count > 0));
         }
 
+        [Ignore(IgnoreMessage = "This test is ignored because it requires a running MCP server.")]
         [TestMethod(DisplayName = "Verifies that a Model Context Protocol (MCP) action rule is invoked successfully, " +
             "and that both the raw response and structured content are stored in session parameters " +
             "without producing execution exceptions.")]
