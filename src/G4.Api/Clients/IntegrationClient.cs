@@ -357,16 +357,16 @@ namespace G4.Api.Clients
                 var client = new ModelContextProtocolClient(server.Key, server.Value);
 
                 // Retrieve the plugins from the current server, which are organized by plugin type.
-                var domain = client.GetModelContextPlugins(server.Key, server.Value);
+                var domains = client.GetModelContextPlugins(server.Key, server.Value);
 
                 // Iterate through each plugin type group retrieved from the server.
-                foreach (var plugins in domain)
+                foreach (var domain in domains)
                 {
                     // Iterate through each plugin in the current plugin type group.
-                    foreach (var plugin in plugins.Value)
+                    foreach (var plugin in domain.Value)
                     {
                         // Add or overwrite the plugin entry in the cache using the plugin type and plugin key.
-                        cache.PluginsCache[plugins.Key][plugin.Key] = plugin.Value;
+                        cache.PluginsCache[domain.Key][plugin.Key] = plugin.Value;
                     }
                 }
             }
