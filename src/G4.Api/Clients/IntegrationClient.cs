@@ -6,6 +6,9 @@ using G4.Credentials;
 using G4.Credentials.Models;
 using G4.Extensions;
 using G4.Models;
+using G4.Plugins.Clients;
+
+using Microsoft.AspNetCore.Hosting.Server;
 
 using System;
 using System.Collections.Concurrent;
@@ -348,13 +351,23 @@ namespace G4.Api.Clients
             servers ??= new Dictionary<string, McpServerModel>();
 
             // Retrieve all MCP plugins from the configured servers, grouped by plugin type.
-            foreach (var item in servers.GetModelContextPlugins())
+            foreach (var server in servers)
             {
-                // Iterate through each plugin in the current plugin type group.
-                foreach (var plugin in item.Value)
+                // Create a new client instance for the current server using its key and value.
+                var client = new ModelContextProtocolClient(server.Key, server.Value);
+
+                // Retrieve the plugins from the current server, which are organized by plugin type.
+                var domain = client.GetModelContextPlugins(server.Key, server.Value);
+
+                // Iterate through each plugin type group retrieved from the server.
+                foreach (var plugins in domain)
                 {
-                    // Add or overwrite the plugin entry in the cache using the plugin type and plugin key.
-                    cache.PluginsCache[item.Key][plugin.Key] = plugin.Value;
+                    // Iterate through each plugin in the current plugin type group.
+                    foreach (var plugin in plugins.Value)
+                    {
+                        // Add or overwrite the plugin entry in the cache using the plugin type and plugin key.
+                        cache.PluginsCache[plugins.Key][plugin.Key] = plugin.Value;
+                    }
                 }
             }
         }
