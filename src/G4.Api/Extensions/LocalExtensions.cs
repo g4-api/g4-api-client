@@ -279,7 +279,6 @@ namespace G4.Extensions
                 stageStatus.JobsStatus[jobId] = new G4AutomationStatusModel.JobStatusModel
                 {
                     CompletedRules = 0,
-                    Description = args.Stage.Description,
                     Name = args.Stage.Name,
                     PendingRules = rules,
                     Progress = 0,
@@ -330,7 +329,6 @@ namespace G4.Extensions
                 {
                     CompletedJobs = 0,
                     CompletedRules = 0,
-                    Description = args.Stage.Description,
                     JobsStatus = jobsStatus,
                     Name = args.Stage.Name,
                     PendingJobs = jobs,
@@ -381,7 +379,6 @@ namespace G4.Extensions
                         CompletedJobs = 0,
                         CompletedRules = 0,
                         CompletedStages = 0,
-                        Description = automationReference.Description,
                         Name = automationReference.Name,
                         PendingJobs = jobs,
                         PendingRules = rules,

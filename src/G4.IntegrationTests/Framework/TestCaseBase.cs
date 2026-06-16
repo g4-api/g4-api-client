@@ -45,13 +45,13 @@ namespace G4.IntegrationTests.Framework
             _environments ??= [];
 
             // Parse and set the number of test case attempts
-            _attempts = context.Properties.ContainsKey(key: "Integration.NumberOfAttempts")
-                ? int.Parse($"{context.Properties["Integration.NumberOfAttempts"]}")
+            _attempts = context.Properties.TryGetValue(key: "Integration.NumberOfAttempts", out object numberOfAttempts)
+                ? int.Parse($"{numberOfAttempts}")
                 : int.Parse("1");
 
             // Parse and set the time interval between test case attempts
-            _attemptsDelay= context.Properties.ContainsKey(key: "Integration.AttemptsDelay")
-                ? int.Parse($"{context.Properties["Integration.AttemptsDelay"]}")
+            _attemptsDelay= context.Properties.TryGetValue(key: "Integration.AttemptsDelay", out object attemptsDelay)
+                ? int.Parse($"{attemptsDelay}")
                 : int.Parse("15000");
 
             // Set the application under test from the test context properties
@@ -375,8 +375,7 @@ namespace G4.IntegrationTests.Framework
                             {
                                 Reference = new()
                                 {
-                                    Description = "Job responsible for invoking integration a single integration test.",
-                                    Name = $"Invoking Test {testCase.GetType().FullName}",
+                                    Name = $"Invoking Test {testCase.GetType().FullName}"
                                 },
                                 Rules = actionsList
                             }
