@@ -306,7 +306,6 @@ namespace G4.Api.Clients
 
                 // Update the progress status with details from the automation.
                 queueModel.ProgressStatus.GroupId = queueModel.Automation.GroupId;
-                queueModel.ProgressStatus.Description = queueModel.Automation.Reference.Description;
                 queueModel.ProgressStatus.Iteration = i;
                 queueModel.ProgressStatus.Name = queueModel.Automation.Reference.Name;
                 queueModel.ProgressStatus.Id = $"{queueModel.Automation.Reference.Id}";

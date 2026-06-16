@@ -120,8 +120,7 @@ namespace G4.UnitTests.Engine
             {
                 Reference = new()
                 {
-                    Name = TestBase.NewRandomString(5),
-                    Description = TestBase.NewRandomString(5),
+                    Name = TestBase.NewRandomString(5)
                 },
                 Rules = NewLoginRules()
             };
@@ -131,8 +130,7 @@ namespace G4.UnitTests.Engine
             {
                 Reference = new()
                 {
-                    Name = TestBase.NewRandomString(5),
-                    Description = TestBase.NewRandomString(5),
+                    Name = TestBase.NewRandomString(5)
                 },
                 Rules = NewAssertionRules()
             };
