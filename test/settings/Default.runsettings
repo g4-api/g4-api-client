@@ -2,7 +2,7 @@
 <RunSettings>
 	<TestRunParameters>
 		<!-- Settings: Selenium Grid -->
-		<Parameter name="Grid.Endpoint" value="E:\Binaries\Automation\WebDrivers" />
+		<Parameter name="Grid.Endpoint" value="" />
 		<Parameter name="BrowserStack.Username" value="" />
 		<Parameter name="BrowserStack.Password" value="" />
 

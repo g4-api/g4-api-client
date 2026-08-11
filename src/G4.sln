@@ -24,6 +24,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".test", ".test", "{064F4B96-18CF-4E22-A647-44D624BAB6C0}"
 	ProjectSection(SolutionItems) = preProject
 		..\test\settings\Default.runsettings = ..\test\settings\Default.runsettings
+		..\test\settings\Local.runsettings = ..\test\settings\Local.runsettings
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".scripts", ".scripts", "{38AEC001-3A21-48E2-AC8B-5B9100AF4193}"
