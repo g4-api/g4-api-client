@@ -26,7 +26,7 @@ env:
   #
   # Build and release settings
   ARTIFACT_TYPE       : 'Production'
-  DOTNET_VERSION      : '8.0.x'
+  DOTNET_VERSION      : '10.0.x'
   BINARIES_DIRECTORY  : ${{ github.workspace }}/binaries
   BUILD_CONFIGURATION : 'Release'
   SOLUTION_NAME       : 'G4'
@@ -59,7 +59,7 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     
     - name: Parse Build Version for GitHub Tag
       id: parse-version
@@ -85,10 +85,10 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: "${{ env.DOTNET_VERSION }}"
 
@@ -145,7 +145,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set the Default Test Settings File
         id: set-run-settings
@@ -272,7 +272,7 @@ jobs:
 
       - name: Publish ${{ matrix.test-project.step-title }} Artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.test-project.artifact }}
           path: ${{ env.STAGE_DIRECTORY }}/${{ matrix.test-project.prefix }}*.*
@@ -312,7 +312,7 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: New Packages v${{ env.BUILD_VERSION }}
       shell: pwsh
@@ -325,7 +325,7 @@ jobs:
         dotnet nuget push "${{ env.STAGE_DIRECTORY }}/*.nupkg" --api-key ${{ env.NUGET_API_KEY }} --source ${{ env.NUGET_SOURCE }}
 
     - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: nuget-packages-drop-v${{ env.BUILD_VERSION }}
         path: ${{ env.STAGE_DIRECTORY }}/*.nupkg
@@ -346,10 +346,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Download Build Artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         path: ${{ env.STAGE_DIRECTORY }}
 
@@ -358,7 +358,7 @@ jobs:
         ls -R ${{ env.STAGE_DIRECTORY }}
 
     - name: Create GitHub Release & Tag v${{ env.BUILD_VERSION }}
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: |
           **/*.zip

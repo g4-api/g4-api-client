@@ -30,12 +30,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="G4.Cache" Version="2026.8.10.73" />
-		<PackageReference Include="G4.CredentialsManager" Version="2026.8.10.73" />
-		<PackageReference Include="G4.Plugins" Version="2026.8.10.73" />
-		<PackageReference Include="G4.Plugins.Common" Version="2026.8.10.140" />
-		<PackageReference Include="G4.Plugins.Google" Version="2026.8.10.140" />
-		<PackageReference Include="G4.Plugins.Ui" Version="2026.8.10.140" />
+		<PackageReference Include="G4.Cache" Version="2026.8.11.74" />
+		<PackageReference Include="G4.CredentialsManager" Version="2026.8.11.74" />
+		<PackageReference Include="G4.Plugins" Version="2026.8.11.74" />
+		<PackageReference Include="G4.Plugins.Common" Version="2026.8.11.141" />
+		<PackageReference Include="G4.Plugins.Google" Version="2026.8.11.141" />
+		<PackageReference Include="G4.Plugins.Ui" Version="2026.8.11.141" />
 	</ItemGroup>
 
 </Project>
