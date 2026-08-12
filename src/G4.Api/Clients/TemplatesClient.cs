@@ -76,6 +76,9 @@ namespace G4.Api.Clients
                 return 400;
             }
 
+            // Reject cache identity and canonical-key collisions before changing persistent template state.
+            AssertCacheRegistration(_cache, cacheModel);
+
             // Remove any existing template with the same key to avoid duplication
             // Retrieve the Templates collection from LiteDB
             RemoveDuplicates(client: this, manifest.Key);
@@ -104,13 +107,20 @@ namespace G4.Api.Clients
 
             // Retrieve the collection and associated documents for the specified environment.
             var documents = collection
-                .Find(i => i.Type.Equals(nameof(IG4PluginManifest), StringComparison.OrdinalIgnoreCase));
+                .Find(i => i.Type.Equals(nameof(IG4PluginManifest), StringComparison.OrdinalIgnoreCase))
+                .ToArray();
 
             // Select the Ids of the documents to be removed and convert them to BsonValue.
             var documentsToRemove = documents.Select(i => new BsonValue(i.Id));
 
             // Delete all documents with the selected Ids from the collection.
             collection.DeleteMany(predicate: "_id IN @0", args: new BsonArray(documentsToRemove));
+
+            // Remove every persisted template from the same authoritative cache instance after persistence succeeds.
+            foreach (var document in documents.DistinctBy(document => document.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                RemoveCachedTemplate(_cache, document);
+            }
         }
 
         /// <inheritdoc />
@@ -158,8 +168,61 @@ namespace G4.Api.Clients
             // Delete all documents with the selected Ids from the collection.
             collection.DeleteMany(predicate: "_id IN @0", args: new BsonArray(documentsToRemove));
 
+            // Remove the persisted template identity through the event-producing cache mutation path.
+            RemoveCachedTemplate(_cache, documents[0]);
+
             // Return a 204 No Content status code to indicate successful removal
             return 204;
+        }
+
+        // Validates the flat-cache registration constraints before LiteDB state is replaced.
+        // This preflight prevents a rejected cache mutation from leaving persistence ahead of the in-memory database.
+        private static void AssertCacheRegistration(CacheManager cache, G4PluginCacheModel cacheModel)
+        {
+            // An absent Action bucket cannot contain a key or alias collision.
+            var isActionBucket = cache.PluginsCache.TryGetValue(cacheModel.Manifest.PluginType, out var plugins);
+
+            if (!isActionBucket)
+            {
+                return;
+            }
+
+            // Reject an incoming canonical key that currently resolves another capability through an alias.
+            var isKeyLookup = plugins.TryGetValue(cacheModel.Manifest.Key, out var keyModel);
+            var isCanonicalLookup = isKeyLookup && keyModel.Manifest.Key.Equals(
+                cacheModel.Manifest.Key,
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isKeyLookup && !isCanonicalLookup)
+            {
+                var message = $"Template key '{cacheModel.Manifest.Key}' conflicts with an alias owned by " +
+                    $"'{keyModel.Manifest.Key}'.";
+                throw new InvalidOperationException(message);
+            }
+
+            // Reject the known flat-cache limitation when the same physical key represents another namespace.
+            if (isCanonicalLookup && !TestSameNamespace(keyModel.Manifest.Namespace, cacheModel.Manifest.Namespace))
+            {
+                var message = $"Template key '{cacheModel.Manifest.Key}' is already registered under namespace " +
+                    $"'{GetNormalizedNamespace(keyModel.Manifest.Namespace)}'.";
+                throw new InvalidOperationException(message);
+            }
+
+            // Reject aliases that would replace another model's canonical cache entry.
+            foreach (var alias in cacheModel.Manifest.Aliases ?? [])
+            {
+                var isAliasLookup = plugins.TryGetValue(alias, out var aliasModel);
+                var isOtherCanonical = isAliasLookup &&
+                    !ReferenceEquals(aliasModel, keyModel) &&
+                    aliasModel.Manifest.Key.Equals(alias, StringComparison.OrdinalIgnoreCase);
+
+                if (isOtherCanonical)
+                {
+                    var message = $"Template alias '{alias}' conflicts with the canonical key owned by " +
+                        $"'{aliasModel.Manifest.Key}'.";
+                    throw new InvalidOperationException(message);
+                }
+            }
         }
 
         // Retrieves a single ApplicationParametersModel document from the specified LiteDatabase collection based on the provided environment name.
@@ -180,6 +243,59 @@ namespace G4.Api.Clients
 
             // Return the collection and document as a tuple
             return (collection, documents);
+        }
+
+        // Normalizes an omitted namespace to the system identity used by CacheManager and lexical retrieval.
+        private static string GetNormalizedNamespace(string @namespace)
+        {
+            // Preserve explicit namespaces while assigning omitted templates to G4.System.
+            return string.IsNullOrEmpty(@namespace)
+                ? "G4.System"
+                : @namespace;
+        }
+
+        // Removes one persisted template only when the current cache entry still represents that template identity.
+        // A later non-template replacement remains untouched, while normal removals publish through CacheManager.
+        private static void RemoveCachedTemplate(CacheManager cache, IG4PluginManifest manifest)
+        {
+            // Stop when the Action bucket or physical key is already absent from the authoritative cache.
+            var isActionBucket = cache.PluginsCache.TryGetValue("Action", out var plugins);
+            var cacheModel = default(G4PluginCacheModel);
+            var isCached = isActionBucket && plugins.TryGetValue(manifest.Key, out cacheModel);
+
+            if (!isCached)
+            {
+                return;
+            }
+
+            // Preserve a later replacement when it is not the persisted template identity being removed.
+            var isTemplate = cacheModel.Type == typeof(TemplatePlugin);
+            var isSameIdentity = TestSameIdentity(cacheModel.Manifest, manifest);
+
+            if (!isTemplate || !isSameIdentity)
+            {
+                return;
+            }
+
+            // Remove the canonical model and every owned alias through the synchronous event-producing operation.
+            cache.RemoveCacheEntity(entityType: "Action", entityKey: manifest.Key);
+        }
+
+        // Tests whether two manifests represent the same normalized namespace-plus-key logical identity.
+        private static bool TestSameIdentity(IG4PluginManifest left, IG4PluginManifest right)
+        {
+            // Require both canonical components to match case-insensitively.
+            return left.Key.Equals(right.Key, StringComparison.OrdinalIgnoreCase) &&
+                TestSameNamespace(left.Namespace, right.Namespace);
+        }
+
+        // Tests namespace equality after normalizing omitted values to G4.System.
+        private static bool TestSameNamespace(string left, string right)
+        {
+            // Compare normalized namespaces using the cache's case-insensitive identity behavior.
+            return GetNormalizedNamespace(left).Equals(
+                GetNormalizedNamespace(right),
+                StringComparison.OrdinalIgnoreCase);
         }
         #endregion
     }
