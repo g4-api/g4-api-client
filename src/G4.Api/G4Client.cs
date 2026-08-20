@@ -5,6 +5,8 @@ using G4.Cache;
 
 using Microsoft.Extensions.Logging;
 
+using System;
+
 namespace G4.Api
 {
     /// <summary>
@@ -15,6 +17,14 @@ namespace G4.Api
     /// <param name="logger">The logger instance for logging.</param>
     public class G4Client(CacheManager cache, IQueueManager queueManager, ILogger logger)
     {
+        #region *** Fields       ***
+        // Lazily-created, shared credentials client. Building it re-initializes the credentials
+        // table on the shared SqliteConnection, so it is created once per process rather than on
+        // every G4Client construction to avoid redundant, contended access to that connection.
+        private static readonly Lazy<ICredentialsClient> _credentials =
+            new(() => new CredentialsClient(CacheManager.SqliteConnection));
+        #endregion
+
         #region *** Constructors ***
         /// <summary>
         /// Initializes a new instance of the <see cref="G4Client"/> class with default LiteDatabase, cache, queue manager, and logger.
@@ -89,7 +99,7 @@ namespace G4.Api
         /// <summary>
         /// Gets the client used for managing credentials.
         /// </summary>
-        public ICredentialsClient Credentials { get; } = new CredentialsClient(CacheManager.SqliteConnection);
+        public ICredentialsClient Credentials => _credentials.Value;
 
         /// <summary>
         /// Gets the environments client responsible for managing different environments within the G4 system.
