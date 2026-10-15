@@ -1,10 +1,14 @@
-﻿using G4.Cache;
+﻿using G4.Api;
+using G4.Cache;
 using G4.Models;
+using G4.Settings;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using System;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace G4.UnitTests.Engine
 {
@@ -13,6 +17,21 @@ namespace G4.UnitTests.Engine
     [TestCategory("UnitTest")]
     public class AssembliesLoaderTests
     {
+        [TestMethod]
+        public void T()
+        {
+            var automation = JsonSerializer.Deserialize<G4AutomationModel>(File.ReadAllText(@"e:\garbage\zzzz.txt"), AppSettings.JsonOptions);
+            var client = new G4Client();
+
+            // Invoke the automation process and get the response.
+            var response =client.Automation.Invoke(automation);
+
+            // Retrieve the session information from the response.
+            var session = response.Values.Last().Sessions.Last();
+
+            var a = "";
+        }
+
         [TestMethod(DisplayName = "Verify that the number of imported assemblies and types " +
             "meets certain criteria.")]
         public void AssembliesNumberTest()

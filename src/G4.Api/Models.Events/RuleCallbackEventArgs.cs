@@ -22,6 +22,14 @@ namespace G4.Api.Models
         public IAutomationClient Client { get; set; }
 
         /// <summary>
+        /// Gets or sets the flows client managing the automation when the callback comes from a flow invocation.
+        /// </summary>
+        /// <remarks>
+        /// Set only for flow invocations, where <see cref="Client"/> is <c>null</c>; null for plain automation invocations.
+        /// </remarks>
+        public IFlowsClient FlowsClient { get; set; }
+
+        /// <summary>
         /// Gets or sets the collection of automation queue models.
         /// </summary>
         public IEnumerable<AutomationQueueModel> Queue { get; set; }

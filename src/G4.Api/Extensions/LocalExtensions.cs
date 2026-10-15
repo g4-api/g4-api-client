@@ -1,4 +1,5 @@
 ﻿using G4.Converters;
+using G4.Exceptions;
 using G4.Models;
 
 using System;
@@ -20,6 +21,9 @@ namespace G4.Extensions
             new TypeConverter(),
             new MethodBaseConverter(),
             new DateTimeIso8601Converter());
+
+        // The only supported automation data source type, in the upper case NewDataTable compares types in.
+        private const string JsonDataSourceType = "JSON";
 
         extension(AutomationQueueModel queueModel)
         {
@@ -954,32 +958,46 @@ namespace G4.Extensions
                 // Retrieve the data source from the automation model.
                 var dataSource = automation.DataSource;
 
-                // Return the default value if the data source is null or has a default value.
-                if (dataSource?.Source == default)
+                // Return the default value if the data source is missing or has no source.
+                if (string.IsNullOrWhiteSpace(dataSource?.Source))
                 {
                     // Return the default value containing the initialized automation model.
                     return [defaultValue];
                 }
 
-                // Create a new data table from the data source.
-                var dataTable = NewDataTable(automation.DataSource);
+                // Create a new data table from the data source; a source that cannot be read
+                // throws G4DataSourceException, which fails the whole invocation.
+                var dataTable = NewDataTable(dataProvider: dataSource);
 
-                // Serialize the automation model and copy the data table.
-                var automations = JsonSerializer.Serialize(automation, options).Copy(dataTable).ToList();
+                // Serialize the automation into a node, so its data source can be removed without changing
+                // the caller's automation.
+                var automationNode = JsonSerializer.SerializeToNode(automation, options).AsObject();
+                var dataSourceKeys = automationNode
+                    .Select(i => i.Key)
+                    .Where(i => i.Equals(nameof(G4AutomationModel.DataSource), StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                // Remove the data source from the serialized node, so no row copy carries the data
+                // (the key casing follows the serializer naming policy, so it is matched case-insensitively).
+                foreach (var key in dataSourceKeys)
+                {
+                    automationNode.Remove(key);
+                }
+
+                // Write the node once, so every row copy is deserialized from the same text.
+                var automationJson = automationNode.ToJsonString(options);
 
                 // Initialize a list to hold the results.
                 var results = new List<(G4AutomationModel Automation, IDictionary<string, object> DataProvider)>();
 
-                // Iterate through each serialized string and data row.
-                for (int i = 0; i < automations.Count; i++)
+                // Create one automation per data row; the rows resolve the {{$ columns.Name }} placeholders
+                // when each automation is initialized with its data provider.
+                for (int i = 0; i < dataTable.Rows.Count; i++)
                 {
-                    var (result, row) = automations[i];
+                    var row = dataTable.Rows[i];
 
-                    // Deserialize the string back into an automation model.
-                    var onAutomation = JsonSerializer.Deserialize<G4AutomationModel>(result, options);
-
-                    // Clear the data source for the new automation model.
-                    onAutomation.DataSource = null;
+                    // Deserialize a new automation model for the row.
+                    var onAutomation = JsonSerializer.Deserialize<G4AutomationModel>(automationJson, options);
 
                     // Assign the same group ID to each automation model.
                     onAutomation.GroupId = groupId;
@@ -1177,91 +1195,190 @@ namespace G4.Extensions
             /// Creates a new <see cref="DataTable"/> from the specified <see cref="G4DataProviderModel"/>.
             /// </summary>
             /// <returns>A <see cref="DataTable"/> created from the specified data provider model.</returns>
-            /// <exception cref="NotImplementedException">Thrown when the data provider type is not implemented.</exception>
+            /// <remarks>
+            /// A null or empty type means <c>Json</c>. The source is a path to a file holding the data, the JSON array
+            /// itself, or the Base64 encoding of the JSON array. The data provider model is never changed.
+            /// </remarks>
+            /// <exception cref="G4DataSourceException">
+            /// Thrown when the type is not supported, or when the source, its rows, or the filter cannot be read.
+            /// </exception>
             public DataTable NewDataTable()
             {
-                // Creates a DataTable from JSON data based on a data provider model.
+                // Resolve the type once, so a missing type means JSON and the comparison ignores casing.
+                var isTypeMissing = string.IsNullOrWhiteSpace(dataProvider.Type);
+                var type = isTypeMissing ? JsonDataSourceType : dataProvider.Type.Trim().ToUpperInvariant();
+
+                // Reject an unsupported type before any source is read, so the caller learns which types exist.
+                if (type != JsonDataSourceType)
+                {
+                    var message = $"The data source type '{dataProvider.Type}' is not supported. Supported types: Json.";
+                    throw new G4DataSourceException(message);
+                }
+
+                // Read the rows from the JSON source; the data provider model is never changed.
+                return NewFromJson(dataProvider);
+
+                // Creates the data table of a JSON data source: reads the source, converts it into JSON, and selects
+                // the filtered rows. An empty source or an empty array gives an empty table, so the automation runs
+                // zero times. Every other failure throws G4DataSourceException; the data provider is only read.
                 static DataTable NewFromJson(G4DataProviderModel dataProvider)
                 {
-                    // Selects rows from a DataTable based on a filter expression.
-                    static DataTable SelectRows(DataTable dataTable, string filterExpression)
-                    {
-                        // Check if the filter expression is empty
-                        // If the filter expression is empty, return the original DataTable
-                        if (filterExpression.Length == 0)
-                        {
-                            return dataTable;
-                        }
-
-                        // Select rows based on the filter expression
-                        var rows = dataTable.Select(filterExpression);
-
-                        // Create a new DataTable with the same structure as the original DataTable
-                        var copiedDataTable = dataTable.Clone();
-
-                        // Import selected rows into the new DataTable
-                        foreach (DataRow row in rows)
-                        {
-                            copiedDataTable.ImportRow(row);
-                        }
-
-                        // Return the new DataTable containing the selected rows
-                        return copiedDataTable;
-                    }
-
-                    // Check if the JSON data source is empty
-                    // If the JSON data source is empty, return an empty DataTable
-                    if (string.IsNullOrEmpty(dataProvider.Source))
+                    // Treat an empty source as a source without rows.
+                    if (string.IsNullOrWhiteSpace(dataProvider.Source))
                     {
                         return new DataTable();
                     }
 
-                    // Create a new DataTable to hold the JSON data
-                    var dataTable = new DataTable();
+                    // Read the source into JSON text: file contents, inline JSON, or decoded Base64.
+                    var json = ConvertToJson(text: ReadSource(source: dataProvider.Source));
 
-                    // Ensure that the filter expression is not null
-                    dataProvider.Filter = (string.IsNullOrEmpty(dataProvider.Filter)) ? string.Empty : dataProvider.Filter;
+                    // Parse the JSON text, so its shape can be checked before the rows are read.
+                    var token = ConvertToToken(json);
 
-                    // Check if the JSON data source exists as a file
-                    // If the JSON data source exists as a file, read its contents
-                    if (System.IO.File.Exists(dataProvider.Source))
+                    // Accept only a JSON array, because each array item is one row.
+                    if (token is not Newtonsoft.Json.Linq.JArray array)
                     {
-                        dataProvider.Source = System.IO.File.ReadAllText(dataProvider.Source);
+                        var message = $"The data source must be a JSON array of rows, but it is a JSON {token.Type}.";
+                        throw new G4DataSourceException(message);
                     }
 
-                    // Parse the JSON data into a JToken
-                    var token = Newtonsoft.Json.Linq.JToken.Parse(dataProvider.Source);
-
-                    // Check if the JSON data is an array
-                    // If the JSON data is not an array, return an empty DataTable
-                    if (token is not Newtonsoft.Json.Linq.JArray)
+                    // Return an empty table for an empty array, so the automation runs zero times.
+                    if (array.Count == 0)
                     {
-                        return dataTable;
+                        return new DataTable();
                     }
 
-                    // Check if the JSON array is empty
-                    // If the JSON array is empty, return an empty DataTable
-                    if (((Newtonsoft.Json.Linq.JArray)token).Count == 0)
-                    {
-                        return dataTable;
-                    }
+                    // Read the rows into a table, then keep only the rows the filter selects.
+                    var dataTable = ConvertToDataTable(json);
 
-                    // Deserialize the JSON data into a DataTable
-                    dataTable = Newtonsoft.Json.JsonConvert.DeserializeObject<DataTable>(dataProvider.Source);
-
-                    // Select rows from the DataTable based on the filter expression
                     return SelectRows(dataTable, filterExpression: dataProvider.Filter);
                 }
 
-                // Determine the data provider type and call the appropriate method
-                return dataProvider.Type.ToUpper() switch
+                // Converts the source text into JSON text: text starting with '[' or '{' is JSON and is used as it is,
+                // anything else is decoded from Base64. Throws G4DataSourceException when the text is not Base64.
+                static string ConvertToJson(string text)
                 {
-                    // If the data provider type is JSON, call the method to create a DataTable from JSON
-                    "JSON" => NewFromJson(dataProvider),
+                    // Trim the text first, so whitespace and a byte order mark never hide the JSON start.
+                    var json = ConvertToTrimmedText(text);
 
-                    // For any other data provider type, throw a NotImplementedException
-                    _ => throw new NotImplementedException()
-                };
+                    // Use JSON as it is; '[' and '{' are not Base64 characters, so this test cannot mistake Base64.
+                    var isJson = json.StartsWith('[') || json.StartsWith('{');
+                    if (isJson)
+                    {
+                        return json;
+                    }
+
+                    // Decode Base64; the extension returns its input unchanged when it cannot decode it.
+                    var decoded = json.ConvertFromBase64();
+                    if (decoded == json)
+                    {
+                        var message = "The data source is not a file path, a JSON array, or the Base64 encoding of a JSON array.";
+                        throw new G4DataSourceException(message);
+                    }
+
+                    // Trim the decoded text the same way, so encoded files with a byte order mark are accepted.
+                    return ConvertToTrimmedText(text: decoded);
+                }
+
+                // Reads the rows of a JSON array into a data table. Throws G4DataSourceException when a row is not
+                // an object or a column mixes value types, keeping the reader's reason in the message.
+                static DataTable ConvertToDataTable(string json)
+                {
+                    try
+                    {
+                        // Deserialize the rows; each object property becomes a column.
+                        return Newtonsoft.Json.JsonConvert.DeserializeObject<DataTable>(json);
+                    }
+                    catch (Exception exception) when (
+                        exception is Newtonsoft.Json.JsonException or ArgumentException or InvalidCastException)
+                    {
+                        // Explain the table contract with the reader's reason, so the caller can fix the rows.
+                        var message = "The data source rows cannot be read into a table. " +
+                            "Each row must be a JSON object, and each column must hold values of one type: " +
+                            exception.Message;
+                        throw new G4DataSourceException(message, innerException: exception);
+                    }
+                }
+
+                // Parses JSON text into a token. Throws G4DataSourceException with the parser's reason when the text
+                // is not valid JSON.
+                static Newtonsoft.Json.Linq.JToken ConvertToToken(string json)
+                {
+                    try
+                    {
+                        // Parse the text; the token type tells whether it holds rows.
+                        return Newtonsoft.Json.Linq.JToken.Parse(json);
+                    }
+                    catch (Newtonsoft.Json.JsonException exception)
+                    {
+                        // Report the parser's reason, so the caller can find the broken part of the JSON.
+                        var message = $"The data source is not valid JSON: {exception.Message}";
+                        throw new G4DataSourceException(message, innerException: exception);
+                    }
+                }
+
+                // Removes surrounding whitespace and a leading byte order mark, which some editors write. Pure; it
+                // never fails for a non-null text.
+                static string ConvertToTrimmedText(string text)
+                {
+                    return text.Trim().TrimStart('\uFEFF').Trim();
+                }
+
+                // Reads the source text: the contents of an existing file, otherwise the source itself. The file is
+                // only read, and a file that exists but cannot be read throws G4DataSourceException.
+                static string ReadSource(string source)
+                {
+                    // Treat a source that is not an existing file as the data itself.
+                    if (!System.IO.File.Exists(source))
+                    {
+                        return source;
+                    }
+
+                    try
+                    {
+                        // Read the file contents as the data.
+                        return System.IO.File.ReadAllText(source);
+                    }
+                    catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException)
+                    {
+                        // Name the file and the reason, so the caller can fix access to it.
+                        var message = $"The data source file '{source}' cannot be read: {exception.Message}";
+                        throw new G4DataSourceException(message, innerException: exception);
+                    }
+                }
+
+                // Selects the rows that match the filter into a new table with the same columns; an empty filter
+                // keeps every row. The source table is not changed, and an invalid filter throws
+                // G4DataSourceException that names the filter.
+                static DataTable SelectRows(DataTable dataTable, string filterExpression)
+                {
+                    // Keep every row when there is no filter.
+                    if (string.IsNullOrWhiteSpace(filterExpression))
+                    {
+                        return dataTable;
+                    }
+
+                    try
+                    {
+                        // Select the matching rows; the filter uses DataView RowFilter syntax.
+                        var rows = dataTable.Select(filterExpression);
+
+                        // Copy the matching rows into a table with the same columns, so the source table stays unchanged.
+                        var copiedDataTable = dataTable.Clone();
+                        foreach (var row in rows)
+                        {
+                            copiedDataTable.ImportRow(row);
+                        }
+
+                        return copiedDataTable;
+                    }
+                    catch (Exception exception) when (exception is EvaluateException or SyntaxErrorException)
+                    {
+                        // Name the filter and the reason, so the caller can fix the expression.
+                        var message = $"The data source filter '{filterExpression}' is not valid: {exception.Message}";
+                        throw new G4DataSourceException(message, innerException: exception);
+                    }
+                }
             }
         }
 
@@ -1328,7 +1445,7 @@ namespace G4.Extensions
                 }
 
                 // Iterate through each top-level rule in the plugin manifest and validate it
-                foreach (var rule in manifest.Rules)
+                foreach (var rule in manifest.GetRules())
                 {
                     ConfirmRule(rule, includes);
                 }
