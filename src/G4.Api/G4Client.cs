@@ -107,6 +107,12 @@ namespace G4.Api
         public IEnvironmentsClient Environments { get; } = new EnvironmentsClient();
 
         /// <summary>
+        /// Gets the flows client responsible for managing and invoking flows, which are complete automations
+        /// persisted and cached by namespace and key, within the G4 system.
+        /// </summary>
+        public IFlowsClient Flows { get; } = new FlowsClient(cache, logger);
+
+        /// <summary>
         /// Gets the integration client responsible for handling integrations within the G4 system.
         /// </summary>
         public IIntegrationClient Integration { get; } = new IntegrationClient();
