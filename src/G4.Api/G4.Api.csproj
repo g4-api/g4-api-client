@@ -34,9 +34,9 @@
 		<PackageReference Include="G4.CredentialsManager" Version="2026.10.15.82" />
 		
 		<PackageReference Include="G4.Plugins" Version="2026.10.15.82" />
-		<PackageReference Include="G4.Plugins.Common" Version="2026.9.19.145" />
-		<PackageReference Include="G4.Plugins.Google" Version="2026.9.19.145" />
-		<PackageReference Include="G4.Plugins.Ui" Version="2026.9.19.145" />
+		<PackageReference Include="G4.Plugins.Common" Version="2026.10.17.147" />
+		<PackageReference Include="G4.Plugins.Google" Version="2026.10.17.147" />
+		<PackageReference Include="G4.Plugins.Ui" Version="2026.10.17.147" />
 	</ItemGroup>
 
 </Project>
