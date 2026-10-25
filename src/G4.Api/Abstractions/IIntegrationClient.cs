@@ -155,9 +155,10 @@ namespace G4.Api.Abstractions
         /// <returns>One result per server; a server that fails or times out does not stop the others.</returns>
         /// <remarks>
         /// The servers are queried at the same time, each within a fixed time limit. Plugins go through the cache's
-        /// validated sync, so new plugin types get a bucket and invalid plugins are rejected. Plugins of a server that
-        /// is no longer configured, and plugins a synchronized server no longer provides, are removed; a server that
-        /// fails keeps its previous plugins.
+        /// sync, so new plugin types get a bucket; every plugin the engine rejects is logged at warning level and
+        /// listed, with the reason, in the server's result. Plugins of a server that is no longer configured, and
+        /// plugins a synchronized server no longer provides, are removed; a server that fails keeps its previous
+        /// plugins.
         /// </remarks>
         IReadOnlyList<McpServerSyncResultModel> SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers);
 

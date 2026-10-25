@@ -35,6 +35,11 @@ namespace G4.Api.Clients
         // busy after this limit is reported as not answering and skipped, well inside Studio's 60-second sync timeout.
         private static readonly TimeSpan McpServerSyncTimeout = TimeSpan.FromSeconds(15);
 
+        // Reason reported when the engine skipped a plugin without an exception; it does so only when it cannot render
+        // the plugin's documentation and examples.
+        private const string EngineRejectionReason =
+            "The engine rejected the plugin: its documentation or examples could not be rendered.";
+
         // Manages caching mechanisms for plugins.
         private readonly CacheManager _cache;
 
@@ -348,8 +353,9 @@ namespace G4.Api.Clients
                 .Distinct()
                 .ToArray();
 
-            // Add them through the cache's validated sync, which creates missing plugin-type buckets.
-            SyncCacheModels(cache, source: "external repositories", cacheModels);
+            // Send them to the cache's sync, which creates missing plugin-type buckets; the plugins the engine
+            // rejects are logged by the helper, and this overload has no result to report them in.
+            _ = SyncCacheModels(cache, source: "external repositories", cacheModels);
         }
 
         /// <inheritdoc />
@@ -389,9 +395,13 @@ namespace G4.Api.Clients
                     continue;
                 }
 
-                // Add the server's plugins and remember them, so the stale-entry pass keeps them.
+                // Send the server's plugins and report the ones the engine rejected; remember every plugin the
+                // server provided, so the stale-entry pass keeps them.
                 var cacheModels = query.Result;
-                SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
+                var rejections = SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
+
+                result.PluginCount -= rejections.Count;
+                result.RejectedPlugins = rejections;
 
                 syncedServerUrls.Add(server.Url);
 
@@ -568,26 +578,51 @@ namespace G4.Api.Clients
             }
         }
 
-        // Adds plugins through the cache's validated sync, one at a time, so a plugin whose key or alias conflicts with
-        // a cached one is logged and skipped while the rest are added.
-        private static void SyncCacheModels(CacheManager cache, string source, IEnumerable<G4PluginCacheModel> cacheModels)
+        // Sends plugins to the engine's cache sync, one at a time, and handles the plugins the engine rejects. The
+        // client does no checks of its own. The engine rejects in two ways: it throws for a key or alias conflict, and
+        // it silently skips a plugin it cannot document, which shows as the plugin missing from the cache afterwards.
+        // Each rejection is logged at warning level; the rejected plugins are returned by key with the reason.
+        private static Dictionary<string, string> SyncCacheModels(
+            CacheManager cache,
+            string source,
+            IEnumerable<G4PluginCacheModel> cacheModels)
         {
+            var rejections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var cacheModel in cacheModels)
             {
+                // Send the plugin; the cache creates a missing plugin-type bucket and registers its aliases.
+                var key = cacheModel?.Manifest?.Key ?? string.Empty;
+                string reason;
+
                 try
                 {
-                    // The cache creates a missing plugin-type bucket, validates the plugin, and registers its aliases.
                     cache.SyncCache(cacheModel);
+
+                    // The engine accepted the plugin when the cache now holds this very model under its key.
+                    var pluginType = cacheModel?.Manifest?.PluginType ?? string.Empty;
+                    var isAccepted = cache.PluginsCache.TryGetValue(pluginType, out var bucket)
+                        && bucket.TryGetValue(key, out var cachedModel)
+                        && ReferenceEquals(cachedModel, cacheModel);
+
+                    if (isAccepted)
+                    {
+                        continue;
+                    }
+
+                    reason = EngineRejectionReason;
                 }
                 catch (Exception exception)
                 {
-                    G4Logger.Instance.LogWarning(
-                        "Plugin '{Key}' from {Source} was not added: {Error}",
-                        cacheModel?.Manifest?.Key,
-                        source,
-                        exception.GetBaseException().Message);
+                    reason = exception.GetBaseException().Message;
                 }
+
+                // Record and log the engine's rejection, so a missing plugin is never silent.
+                rejections[key] = reason;
+                G4Logger.Instance.LogWarning("Plugin '{Key}' from {Source} was not added: {Reason}", key, source, reason);
             }
+
+            return rejections;
         }
         #endregion
 

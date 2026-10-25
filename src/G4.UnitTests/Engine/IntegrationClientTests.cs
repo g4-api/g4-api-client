@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 
 namespace G4.UnitTests.Engine
 {
@@ -80,6 +81,30 @@ namespace G4.UnitTests.Engine
             Assert.IsFalse(condition: bucket.ContainsKey(key: "RemovedServerPlugin"));
             Assert.IsTrue(condition: bucket.ContainsKey(key: "FailingServerPlugin"));
             Assert.IsTrue(condition: bucket.ContainsKey(key: "LocalPlugin"));
+        }
+
+        [TestMethod(DisplayName = "Verify that a plugin the engine rejects is reported with the reason.")]
+        public void SyncCacheModelsReportsEngineRejectionTest()
+        {
+            // Arrange: a plugin without examples, which the engine skips because it cannot render its documentation.
+            var cacheManager = new CacheManager();
+            var rejected = NewPlugin(key: "EngineRejectedPlugin", server: null);
+            var syncCacheModels = typeof(G4Client).Assembly
+                .GetType("G4.Api.Clients.IntegrationClient")
+                .GetMethod("SyncCacheModels", BindingFlags.NonPublic | BindingFlags.Static);
+
+            // Act: send the plugin through the client's sync helper.
+            var rejections = (Dictionary<string, string>)syncCacheModels.Invoke(
+                obj: null,
+                parameters: [cacheManager, "unit test", new[] { rejected }]);
+
+            // Assert: the client reports the engine's rejection with a reason, and the cache does not hold the plugin.
+            var isCached = cacheManager.PluginsCache.TryGetValue(PluginType, out var bucket)
+                && bucket.ContainsKey("EngineRejectedPlugin");
+
+            Assert.IsTrue(condition: rejections.TryGetValue("EngineRejectedPlugin", out var reason));
+            Assert.IsFalse(condition: string.IsNullOrWhiteSpace(value: reason));
+            Assert.IsFalse(condition: isCached);
         }
 
         // Finds a local port with nothing listening on it, so a connection to it is refused at once.
