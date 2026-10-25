@@ -348,9 +348,8 @@ namespace G4.Api.Clients
                 .Distinct()
                 .ToArray();
 
-            // Add them through the cache's sync, which creates missing plugin-type buckets; rejected plugins are
-            // logged with their reason by the helper, and this overload has no result to report them in.
-            _ = SyncCacheModels(cache, source: "external repositories", cacheModels);
+            // Add them through the cache's validated sync, which creates missing plugin-type buckets.
+            SyncCacheModels(cache, source: "external repositories", cacheModels);
         }
 
         /// <inheritdoc />
@@ -390,13 +389,9 @@ namespace G4.Api.Clients
                     continue;
                 }
 
-                // Add the server's plugins and report the ones that were rejected with the reason; remember every
-                // plugin the server provided, so the stale-entry pass keeps them.
+                // Add the server's plugins and remember them, so the stale-entry pass keeps them.
                 var cacheModels = query.Result;
-                var rejections = SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
-
-                result.PluginCount -= rejections.Count;
-                result.RejectedPlugins = rejections;
+                SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
 
                 syncedServerUrls.Add(server.Url);
 
@@ -573,67 +568,26 @@ namespace G4.Api.Clients
             }
         }
 
-        // Returns why this client rejects a plugin, or null when it accepts it. The engine only skips a plugin it
-        // cannot document and keeps no record, so the client applies the same check itself to be able to report the
-        // reason: the manifest must render to a non-empty document, examples included.
-        private static string ResolveRejectionReason(G4PluginCacheModel cacheModel)
+        // Adds plugins through the cache's validated sync, one at a time, so a plugin whose key or alias conflicts with
+        // a cached one is logged and skipped while the rest are added.
+        private static void SyncCacheModels(CacheManager cache, string source, IEnumerable<G4PluginCacheModel> cacheModels)
         {
-            // A plugin without a manifest cannot be identified or documented.
-            if (cacheModel?.Manifest == null)
-            {
-                return "The plugin has no manifest.";
-            }
-
-            // Render the document the cache would publish; a failure names the broken part, such as an example.
-            try
-            {
-                var document = cacheModel.Manifest.ConvertToMarkdown(includeNavigationLinks: false);
-
-                return string.IsNullOrWhiteSpace(document) ? "The plugin documentation rendered empty." : null;
-            }
-            catch (Exception exception)
-            {
-                return exception.GetBaseException().Message;
-            }
-        }
-
-        // Adds plugins through the cache's validated sync, one at a time. A plugin this client rejects, or whose key or
-        // alias conflicts with a cached one, is logged at warning level and skipped while the rest are added.
-        // Returns the skipped plugins by key with the reason, so the caller can report them.
-        private static Dictionary<string, string> SyncCacheModels(
-            CacheManager cache,
-            string source,
-            IEnumerable<G4PluginCacheModel> cacheModels)
-        {
-            var rejections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
             foreach (var cacheModel in cacheModels)
             {
-                // Apply the client's own check first, so the reason is known and reported.
-                var key = cacheModel?.Manifest?.Key ?? string.Empty;
-                var reason = ResolveRejectionReason(cacheModel);
-
-                // Hand an accepted plugin to the cache, which creates a missing plugin-type bucket and registers its
-                // aliases; a key or alias conflict is a rejection too.
-                if (reason == null)
+                try
                 {
-                    try
-                    {
-                        cache.SyncCache(cacheModel);
-                        continue;
-                    }
-                    catch (Exception exception)
-                    {
-                        reason = exception.GetBaseException().Message;
-                    }
+                    // The cache creates a missing plugin-type bucket, validates the plugin, and registers its aliases.
+                    cache.SyncCache(cacheModel);
                 }
-
-                // Record and log the rejection, so a missing plugin is never silent.
-                rejections[key] = reason;
-                G4Logger.Instance.LogWarning("Plugin '{Key}' from {Source} was not added: {Reason}", key, source, reason);
+                catch (Exception exception)
+                {
+                    G4Logger.Instance.LogWarning(
+                        "Plugin '{Key}' from {Source} was not added: {Error}",
+                        cacheModel?.Manifest?.Key,
+                        source,
+                        exception.GetBaseException().Message);
+                }
             }
-
-            return rejections;
         }
         #endregion
 

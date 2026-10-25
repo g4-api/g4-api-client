@@ -154,10 +154,8 @@ namespace G4.Api.Abstractions
         /// <param name="servers">The MCP servers whose plugins should be retrieved and merged into the cache.</param>
         /// <returns>One result per server; a server that fails or times out does not stop the others.</returns>
         /// <remarks>
-        /// The servers are queried at the same time, each within a fixed time limit. The client checks each plugin
-        /// itself (its documentation and examples must render) and logs and reports every plugin it rejects, with the
-        /// reason, in the server's result; accepted plugins go through the cache's sync, so new plugin types get a
-        /// bucket. Plugins of a server that
+        /// The servers are queried at the same time, each within a fixed time limit. Plugins go through the cache's
+        /// validated sync, so new plugin types get a bucket and invalid plugins are rejected. Plugins of a server that
         /// is no longer configured, and plugins a synchronized server no longer provides, are removed; a server that
         /// fails keeps its previous plugins.
         /// </remarks>
