@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace G4.Api.Models
 {
     /// <summary>
@@ -25,9 +28,16 @@ namespace G4.Api.Models
         public string Name { get; set; }
 
         /// <summary>
-        /// Gets or sets the number of plugins the server provided; 0 when it was not synchronized.
+        /// Gets or sets the number of the server's plugins that were added to the cache; 0 when it was not synchronized.
         /// </summary>
         public int PluginCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the server's plugins that were not added, by plugin key, with the reason each was rejected (for
+        /// example an example that cannot be rendered, or a key that conflicts with a cached plugin).
+        /// </summary>
+        public IDictionary<string, string> RejectedPlugins { get; set; }
+            = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Gets or sets the server URL, as configured.
