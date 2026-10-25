@@ -1,4 +1,5 @@
-﻿using G4.Attributes.Abstraction;
+﻿using G4.Api.Models;
+using G4.Attributes.Abstraction;
 using G4.Cache;
 using G4.Credentials.Models;
 using G4.Models;
@@ -151,7 +152,14 @@ namespace G4.Api.Abstractions
         /// </summary>
         /// <param name="cache">The cache manager that will receive the synchronized plugin entries.</param>
         /// <param name="servers">The MCP servers whose plugins should be retrieved and merged into the cache.</param>
-        void SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers);
+        /// <returns>One result per server; a server that fails or times out does not stop the others.</returns>
+        /// <remarks>
+        /// The servers are queried at the same time, each within a fixed time limit. Plugins go through the cache's
+        /// validated sync, so new plugin types get a bucket and invalid plugins are rejected. Plugins of a server that
+        /// is no longer configured, and plugins a synchronized server no longer provides, are removed; a server that
+        /// fails keeps its previous plugins.
+        /// </remarks>
+        IReadOnlyList<McpServerSyncResultModel> SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers);
 
         /// <summary>
         /// Synchronizes the provided <paramref name="cache"/> instance by either updating it with default data or using it as the source of truth to sync other caches.

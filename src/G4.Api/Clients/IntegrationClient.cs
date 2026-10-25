@@ -1,4 +1,6 @@
-﻿using G4.Api.Abstractions;
+﻿using G4.Abstraction.Logging;
+using G4.Api.Abstractions;
+using G4.Api.Models;
 using G4.Attributes;
 using G4.Attributes.Abstraction;
 using G4.Cache;
@@ -9,12 +11,14 @@ using G4.Models;
 using G4.Plugins.Clients;
 
 using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.Extensions.Logging;
 
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace G4.Api.Clients
 {
@@ -26,6 +30,11 @@ namespace G4.Api.Clients
     internal class IntegrationClient: ClientBase, IIntegrationClient
     {
         #region *** Fields       ***
+        // Longest time the MCP sync waits for the servers, which it queries at the same time. One server took about
+        // 5 seconds, while the MCP transport keeps retrying a refused connection for about 30 seconds; a server still
+        // busy after this limit is reported as not answering and skipped, well inside Studio's 60-second sync timeout.
+        private static readonly TimeSpan McpServerSyncTimeout = TimeSpan.FromSeconds(15);
+
         // Manages caching mechanisms for plugins.
         private readonly CacheManager _cache;
 
@@ -332,43 +341,92 @@ namespace G4.Api.Clients
             // Ensure repositories are not null before proceeding.
             repositories ??= [];
 
-            // Retrieve external plugins from the provided repositories.
-            foreach (var item in repositories.GetExternalPlugins())
-            {
-                // Iterate through each plugin within the current plugin type group.
-                foreach (var plugin in item.Value)
-                {
-                    // Update or add the plugin to the cache under the corresponding plugin type and key.
-                    cache.PluginsCache[item.Key][plugin.Key] = plugin.Value;
-                }
-            }
+            // Retrieve external plugins from the provided repositories, one model per plugin (buckets also hold aliases).
+            var cacheModels = repositories
+                .GetExternalPlugins()
+                .SelectMany(i => i.Value.Values)
+                .Distinct()
+                .ToArray();
+
+            // Add them through the cache's validated sync, which creates missing plugin-type buckets.
+            SyncCacheModels(cache, source: "external repositories", cacheModels);
         }
 
         /// <inheritdoc />
-        public void SyncCache(CacheManager cache, IDictionary<string, McpServerModel> servers)
+        public IReadOnlyList<McpServerSyncResultModel> SyncCache(
+            CacheManager cache,
+            IDictionary<string, McpServerModel> servers)
         {
             // Ensure the server collection is always initialized before attempting synchronization.
             servers ??= new Dictionary<string, McpServerModel>();
 
-            // Retrieve all MCP plugins from the configured servers, grouped by plugin type.
-            foreach (var server in servers)
+            // Query every server at the same time, so the sync takes as long as the slowest server, not their sum.
+            var queries = servers
+                .Select(server => (
+                    Name: server.Key,
+                    Server: server.Value,
+                    Query: Task.Run(() => GetServerPlugins(server.Key, server.Value))))
+                .ToArray();
+
+            // Wait for all of them, but no longer than the time limit; a server still busy after it is reported and skipped.
+            Task.WhenAny(Task.WhenAll(queries.Select(i => i.Query)), Task.Delay(McpServerSyncTimeout)).Wait();
+
+            // Add the plugins of every server that answered, and describe the outcome of each server.
+            var results = new List<McpServerSyncResultModel>();
+            var syncedServerUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var syncedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (name, server, query) in queries)
             {
-                // Create a new client instance for the current server using its key and value.
-                var client = new ModelContextProtocolClient(server.Key, server.Value);
+                var result = NewServerSyncResult(name, server, query);
+                results.Add(result);
 
-                // Retrieve the plugins from the current server, which are organized by plugin type.
-                var domains = client.GetModelContextPlugins(server.Key, server.Value);
-
-                // Iterate through each plugin type group retrieved from the server.
-                foreach (var domain in domains)
+                // A failed or slow server keeps its previous plugins, so a short outage does not remove its tools.
+                if (!result.IsSynced)
                 {
-                    // Iterate through each plugin in the current plugin type group.
-                    foreach (var plugin in domain.Value)
-                    {
-                        // Add or overwrite the plugin entry in the cache using the plugin type and plugin key.
-                        cache.PluginsCache[domain.Key][plugin.Key] = plugin.Value;
-                    }
+                    G4Logger.Instance.LogWarning(
+                        "MCP server '{Name}' ({Url}) was not synchronized: {Error}", name, server?.Url, result.Error);
+                    continue;
                 }
+
+                // Add the server's plugins and remember them, so the stale-entry pass keeps them.
+                var cacheModels = query.Result;
+                SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
+
+                syncedServerUrls.Add(server.Url);
+
+                foreach (var cacheModel in cacheModels)
+                {
+                    syncedEntries.Add(NewEntryKey(cacheModel.Manifest.PluginType, cacheModel.Manifest.Key));
+                }
+            }
+
+            // Remove plugins of servers that are no longer configured, and plugins a synchronized server dropped.
+            var configuredServerUrls = new HashSet<string>(
+                servers.Values.Select(i => i?.Url).Where(i => !string.IsNullOrEmpty(i)),
+                StringComparer.OrdinalIgnoreCase);
+
+            RemoveStaleServerPlugins(cache, new StaleServerPluginsOptions
+            {
+                ConfiguredServerUrls = configuredServerUrls,
+                SyncedEntries = syncedEntries,
+                SyncedServerUrls = syncedServerUrls
+            });
+
+            return results;
+
+            // Lists the plugins of one server as cache models. Runs on a worker thread, so a slow server cannot hold
+            // up the others; any failure (refused connection, protocol error) surfaces through the returned task.
+            static G4PluginCacheModel[] GetServerPlugins(string name, McpServerModel server)
+            {
+                // Connect and list the server's tools; the client connects in its constructor.
+                var client = new ModelContextProtocolClient(name, server);
+
+                // One model per plugin; a bucket holds each model under its key and its aliases.
+                return [.. client
+                    .GetModelContextPlugins(name, server)
+                    .SelectMany(i => i.Value.Values)
+                    .Distinct()];
             }
         }
 
@@ -424,6 +482,127 @@ namespace G4.Api.Clients
 
             // Return the collection of driver data objects.
             return cacheData;
+        }
+
+        // Builds the key that identifies one plugin across servers: its plugin type and canonical key.
+        private static string NewEntryKey(string pluginType, string key) => $"{pluginType}/{key}";
+
+        // Describes the outcome of one server query: synchronized with its plugin count, failed with the innermost
+        // error, or still running after the time limit. The query is read only when it completed successfully.
+        private static McpServerSyncResultModel NewServerSyncResult(
+            string name,
+            McpServerModel server,
+            Task<G4PluginCacheModel[]> query)
+        {
+            // Start from the server identity shared by every outcome.
+            var result = new McpServerSyncResultModel
+            {
+                Name = name,
+                Url = server?.Url
+            };
+
+            // A server that is still busy after the time limit is skipped; its task finishes on its own.
+            if (!query.IsCompleted)
+            {
+                result.Error = $"The server did not answer within {McpServerSyncTimeout.TotalSeconds} seconds.";
+                return result;
+            }
+
+            // A failed query names its real cause, which is wrapped in an AggregateException.
+            if (query.IsFaulted || query.IsCanceled)
+            {
+                result.Error = query.Exception?.GetBaseException().Message ?? "The server query was canceled.";
+                return result;
+            }
+
+            // The server answered: report how many plugins it provided.
+            result.IsSynced = true;
+            result.PluginCount = query.Result.Length;
+
+            return result;
+        }
+
+        // Removes MCP plugins that no longer have a source: plugins of servers that are not configured any more, and
+        // plugins a synchronized server no longer provides. Plugins of a configured server that failed are kept.
+        private static void RemoveStaleServerPlugins(CacheManager cache, StaleServerPluginsOptions options)
+        {
+            // Collect the stale MCP plugins from a snapshot, once per model (buckets also hold aliases).
+            var staleModels = cache.PluginsCache
+                .SelectMany(bucket => bucket.Value.Values.Select(model => (PluginType: bucket.Key, Model: model)))
+                .Where(i => !string.IsNullOrEmpty(i.Model?.ModelContextServer?.Url))
+                .DistinctBy(i => i.Model)
+                .Where(i => TestStaleServerPlugin(i.PluginType, i.Model, options))
+                .ToArray();
+
+            // Remove each one through the cache, which also drops its aliases and raises the change event.
+            foreach (var (pluginType, model) in staleModels)
+            {
+                try
+                {
+                    cache.RemoveCacheEntity(pluginType, model.Manifest.Key);
+                }
+                catch (Exception exception)
+                {
+                    // A concurrent sync may have removed it already; the rest are still removed.
+                    G4Logger.Instance.LogWarning(
+                        "Stale MCP plugin '{Key}' could not be removed: {Error}",
+                        model.Manifest.Key,
+                        exception.GetBaseException().Message);
+                }
+            }
+
+            // Tests whether one cached MCP plugin lost its source.
+            static bool TestStaleServerPlugin(string pluginType, G4PluginCacheModel model, StaleServerPluginsOptions options)
+            {
+                // A plugin of a server that is not configured any more has no source.
+                var serverUrl = model.ModelContextServer.Url;
+
+                if (!options.ConfiguredServerUrls.Contains(serverUrl))
+                {
+                    return true;
+                }
+
+                // A plugin of a server that answered is stale when the server no longer provides it.
+                return options.SyncedServerUrls.Contains(serverUrl)
+                    && !options.SyncedEntries.Contains(NewEntryKey(pluginType, model.Manifest.Key));
+            }
+        }
+
+        // Adds plugins through the cache's validated sync, one at a time, so a plugin whose key or alias conflicts with
+        // a cached one is logged and skipped while the rest are added.
+        private static void SyncCacheModels(CacheManager cache, string source, IEnumerable<G4PluginCacheModel> cacheModels)
+        {
+            foreach (var cacheModel in cacheModels)
+            {
+                try
+                {
+                    // The cache creates a missing plugin-type bucket, validates the plugin, and registers its aliases.
+                    cache.SyncCache(cacheModel);
+                }
+                catch (Exception exception)
+                {
+                    G4Logger.Instance.LogWarning(
+                        "Plugin '{Key}' from {Source} was not added: {Error}",
+                        cacheModel?.Manifest?.Key,
+                        source,
+                        exception.GetBaseException().Message);
+                }
+            }
+        }
+        #endregion
+
+        #region *** Nested Types ***
+        // Carries the sources found by one MCP sync to the stale-plugin pass, so the pass needs no further parameters.
+        private sealed class StaleServerPluginsOptions
+        {
+            // Gets or sets the URLs of every configured server, whether or not it answered.
+            public HashSet<string> ConfiguredServerUrls { get; init; }
+
+            // Gets or sets the plugin-type and key pairs the answering servers provided.
+            public HashSet<string> SyncedEntries { get; init; }
+
+            // Gets or sets the URLs of the servers that answered.
+            public HashSet<string> SyncedServerUrls { get; init; }
         }
         #endregion
     }
