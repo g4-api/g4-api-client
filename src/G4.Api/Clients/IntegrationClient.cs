@@ -35,6 +35,10 @@ namespace G4.Api.Clients
         // busy after this limit is reported as not answering and skipped, well inside Studio's 60-second sync timeout.
         private static readonly TimeSpan McpServerSyncTimeout = TimeSpan.FromSeconds(15);
 
+        // Plugin type of every MCP tool: the engine converts each listed tool into an Action plugin, so a tool the
+        // engine rejected is identified in the cache by this type and the tool name.
+        private const string McpPluginType = "Action";
+
         // Reason reported when the engine skipped a plugin without an exception; it does so only when it cannot render
         // the plugin's documentation and examples.
         private const string EngineRejectionReason =
@@ -397,18 +401,29 @@ namespace G4.Api.Clients
 
                 // Send the server's plugins and report the ones the engine rejected; remember every plugin the
                 // server provided, so the stale-entry pass keeps them.
-                var cacheModels = query.Result;
-                var rejections = SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
+                var (cacheModels, rejectedTools) = query.Result;
+                var cacheRejections = SyncCacheModels(cache, source: $"MCP server '{name}'", cacheModels);
 
-                result.PluginCount -= rejections.Count;
-                result.RejectedPlugins = rejections;
-
-                syncedServerUrls.Add(server.Url);
-
-                foreach (var cacheModel in cacheModels)
+                // Log each tool the engine could not convert; the server's other tools are synchronized anyway.
+                foreach (var rejectedTool in rejectedTools)
                 {
-                    syncedEntries.Add(NewEntryKey(cacheModel.Manifest.PluginType, cacheModel.Manifest.Key));
+                    G4Logger.Instance.LogWarning(
+                        "MCP server '{Name}' ({Url}) tool '{Tool}' was rejected: {Reason}",
+                        name,
+                        server.Url,
+                        rejectedTool.Key,
+                        rejectedTool.Value);
                 }
+
+                // Report both kinds of rejection; the plugin count already excludes the tools that were not converted.
+                result.PluginCount -= cacheRejections.Count;
+                result.RejectedPlugins = NewServerRejections(rejectedTools, cacheRejections);
+
+                // Remember the server and everything it still lists, including the rejected tools, so the stale-entry
+                // pass keeps the last good version of a tool the engine now rejects, as the cache does for a plugin it
+                // refuses to replace.
+                syncedServerUrls.Add(server.Url);
+                AddSyncedEntries(syncedEntries, cacheModels, rejectedToolNames: rejectedTools.Keys);
             }
 
             // Remove plugins of servers that are no longer configured, and plugins a synchronized server dropped.
@@ -425,18 +440,49 @@ namespace G4.Api.Clients
 
             return results;
 
-            // Lists the plugins of one server as cache models. Runs on a worker thread, so a slow server cannot hold
-            // up the others; any failure (refused connection, protocol error) surfaces through the returned task.
-            static G4PluginCacheModel[] GetServerPlugins(string name, McpServerModel server)
+            // Lists the plugins of one server as cache models, together with the tools the engine could not convert.
+            // Runs on a worker thread, so a slow server cannot hold up the others; a failure of the whole server
+            // (refused connection, protocol error) surfaces through the returned task, while a single unreadable tool
+            // is only recorded in the rejections.
+            static (G4PluginCacheModel[] Plugins, Dictionary<string, string> RejectedTools) GetServerPlugins(
+                string name,
+                McpServerModel server)
             {
                 // Connect and list the server's tools; the client connects in its constructor.
                 var client = new ModelContextProtocolClient(name, server);
 
+                // Collect the tools the engine rejects, so they are reported instead of failing the server.
+                var rejectedTools = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
                 // One model per plugin; a bucket holds each model under its key and its aliases.
-                return [.. client
-                    .GetModelContextPlugins(name, server)
+                G4PluginCacheModel[] plugins = [.. client
+                    .GetModelContextPlugins(name, server, rejectedTools)
                     .SelectMany(i => i.Value.Values)
                     .Distinct()];
+
+                return (plugins, rejectedTools);
+            }
+        }
+
+        // Records every entry a synchronized server still lists, for the stale-entry pass: the plugins it provided and
+        // the tools the engine rejected. A rejected tool is still listed by its server, so its previously cached version
+        // is kept instead of being removed as dropped; this matches the cache, which keeps a valid entry when it refuses
+        // the replacement. Adds to the caller's set and changes nothing else.
+        private static void AddSyncedEntries(
+            HashSet<string> syncedEntries,
+            IEnumerable<G4PluginCacheModel> cacheModels,
+            IEnumerable<string> rejectedToolNames)
+        {
+            // Every plugin the server provided, under its own plugin type and key.
+            foreach (var cacheModel in cacheModels ?? [])
+            {
+                syncedEntries.Add(NewEntryKey(cacheModel.Manifest.PluginType, cacheModel.Manifest.Key));
+            }
+
+            // Every tool the engine rejected, under the Action type that every MCP tool converts to.
+            foreach (var rejectedToolName in rejectedToolNames ?? [])
+            {
+                syncedEntries.Add(NewEntryKey(McpPluginType, rejectedToolName));
             }
         }
 
@@ -497,12 +543,32 @@ namespace G4.Api.Clients
         // Builds the key that identifies one plugin across servers: its plugin type and canonical key.
         private static string NewEntryKey(string pluginType, string key) => $"{pluginType}/{key}";
 
+        // Combines the rejections of one server into the dictionary its sync result reports: the tools the engine
+        // could not convert, then the plugins the cache refused. The keys never overlap, since a tool that was not
+        // converted never reaches the cache. Builds a new dictionary and leaves both inputs unchanged.
+        private static Dictionary<string, string> NewServerRejections(
+            IDictionary<string, string> rejectedTools,
+            IDictionary<string, string> cacheRejections)
+        {
+            // Key the report case-insensitively, like plugin keys; an absent input contributes nothing.
+            var rejections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            IEnumerable<KeyValuePair<string, string>> noRejections = [];
+
+            // Add the conversion rejections first, which happened first, then the cache rejections.
+            foreach (var rejection in (rejectedTools ?? noRejections).Concat(cacheRejections ?? noRejections))
+            {
+                rejections[rejection.Key] = rejection.Value;
+            }
+
+            return rejections;
+        }
+
         // Describes the outcome of one server query: synchronized with its plugin count, failed with the innermost
         // error, or still running after the time limit. The query is read only when it completed successfully.
         private static McpServerSyncResultModel NewServerSyncResult(
             string name,
             McpServerModel server,
-            Task<G4PluginCacheModel[]> query)
+            Task<(G4PluginCacheModel[] Plugins, Dictionary<string, string> RejectedTools)> query)
         {
             // Start from the server identity shared by every outcome.
             var result = new McpServerSyncResultModel
@@ -527,7 +593,7 @@ namespace G4.Api.Clients
 
             // The server answered: report how many plugins it provided.
             result.IsSynced = true;
-            result.PluginCount = query.Result.Length;
+            result.PluginCount = query.Result.Plugins.Length;
 
             return result;
         }
