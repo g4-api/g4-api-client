@@ -28,6 +28,72 @@ namespace G4.UnitTests.Engine
         // Names of the two unreachable servers, in the order they are configured and reported.
         private static readonly string[] DeadServerNames = ["DeadFirst", "DeadSecond"];
 
+        // Name of the tool the engine rejected in the synced-entries test.
+        private static readonly string[] RejectedToolNames = ["RejectedTool"];
+
+        [TestMethod(DisplayName = "Verify that a tool the engine rejects counts as still listed by its server, so the " +
+            "stale-entry pass keeps its previously cached version.")]
+        public void AddSyncedEntriesKeepsRejectedToolTest()
+        {
+            // Arrange: one plugin the server provided and one tool the engine rejected during conversion.
+            var syncedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var provided = NewPlugin(key: "ProvidedPlugin", server: null);
+            var addSyncedEntries = typeof(G4Client).Assembly
+                .GetType("G4.Api.Clients.IntegrationClient")
+                .GetMethod("AddSyncedEntries", BindingFlags.NonPublic | BindingFlags.Static);
+
+            // Act: record what the synchronized server still lists, the way the MCP sync does.
+            addSyncedEntries.Invoke(
+                obj: null,
+                parameters: [syncedEntries, new[] { provided }, RejectedToolNames]);
+
+            // Assert: both are recorded, the rejected tool under the Action type that every MCP tool converts to.
+            Assert.HasCount(2, syncedEntries);
+            Assert.Contains($"{PluginType}/ProvidedPlugin", syncedEntries);
+            Assert.Contains("Action/RejectedTool", syncedEntries);
+        }
+
+        [TestMethod(DisplayName = "Verify that a server's sync result reports both the tools the engine could not " +
+            "convert and the plugins the cache refused.")]
+        public void NewServerRejectionsCombinesToolAndCacheRejectionsTest()
+        {
+            // Arrange: one tool the engine could not convert and one converted plugin the cache refused.
+            var rejectedTools = new Dictionary<string, string> { ["g4.Unreadable"] = "The tool could not be converted." };
+            var cacheRejections = new Dictionary<string, string> { ["g4.Undocumented"] = "The plugin has no examples." };
+            var newServerRejections = typeof(G4Client).Assembly
+                .GetType("G4.Api.Clients.IntegrationClient")
+                .GetMethod("NewServerRejections", BindingFlags.NonPublic | BindingFlags.Static);
+
+            // Act: combine them the way the client builds a server's sync result.
+            var rejections = (Dictionary<string, string>)newServerRejections.Invoke(
+                obj: null,
+                parameters: [rejectedTools, cacheRejections]);
+
+            // Assert: both rejections are reported with their reasons, and lookups ignore case like plugin keys.
+            Assert.HasCount(2, rejections);
+            Assert.AreEqual("The tool could not be converted.", rejections["G4.UNREADABLE"]);
+            Assert.AreEqual("The plugin has no examples.", rejections["g4.Undocumented"]);
+        }
+
+        [TestMethod(DisplayName = "Verify that a server's sync result reports no rejections when neither the engine " +
+            "nor the cache rejected anything.")]
+        public void NewServerRejectionsEmptyTest()
+        {
+            // Arrange: no rejections from either step, as for a fully synchronized server.
+            var newServerRejections = typeof(G4Client).Assembly
+                .GetType("G4.Api.Clients.IntegrationClient")
+                .GetMethod("NewServerRejections", BindingFlags.NonPublic | BindingFlags.Static);
+
+            // Act: combine two empty sets.
+            var rejections = (Dictionary<string, string>)newServerRejections.Invoke(
+                obj: null,
+                parameters: [new Dictionary<string, string>(), new Dictionary<string, string>()]);
+
+            // Assert: the result is an empty dictionary rather than null, so clients can always read it.
+            Assert.IsNotNull(rejections);
+            Assert.IsEmpty(rejections);
+        }
+
         [TestMethod(DisplayName = "Verify that an unreachable MCP server is reported per server and does not fail the sync.")]
         public void SyncCacheReportsUnreachableServerTest()
         {
