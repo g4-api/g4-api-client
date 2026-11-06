@@ -629,6 +629,7 @@ namespace G4.UnitTests.Engine
             return new G4FlowManifestModel
             {
                 Automation = JsonSerializer.Serialize(automation).ConvertToBase64(),
+                Description = [$"Unit test flow {key}."],
                 Key = key,
                 Namespace = FlowNamespace,
                 Summary = [$"Unit test flow {key}."]
@@ -642,6 +643,7 @@ namespace G4.UnitTests.Engine
             {
                 Aliases = aliases,
                 Automation = NewEncodedAutomation(testContext, argument: string.Empty),
+                Description = [$"Unit test flow {key}."],
                 Key = key,
                 Namespace = FlowNamespace,
                 Summary = [$"Unit test flow {key}."]
