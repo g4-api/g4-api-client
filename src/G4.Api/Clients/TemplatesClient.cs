@@ -32,11 +32,12 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public int AddTemplate(IG4PluginManifest manifest)
         {
-            // Remove any existing template with the same key to avoid duplication
-            static void RemoveDuplicates(TemplatesClient client, string key)
+            // Remove any existing template with the same namespace and key to avoid duplication
+            static void RemoveDuplicates(TemplatesClient client, IG4PluginManifest manifest)
             {
-                // Retrieve the collection and associated documents based on the provided key
-                var (collection, documents) = GetDocuments(client.LiteDatabase, key);
+                // Retrieve the documents of the manifest's own identity; other namespaces keep their templates
+                var reference = PluginReference.GetQualifiedName(manifest.Namespace, manifest.Key);
+                var (collection, documents) = GetDocuments(client.LiteDatabase, reference);
 
                 // If there are no documents, exit the method
                 if (documents.Length == 0)
@@ -79,9 +80,8 @@ namespace G4.Api.Clients
             // Reject cache identity and canonical-key collisions before changing persistent template state.
             AssertCacheRegistration(_cache, cacheModel);
 
-            // Remove any existing template with the same key to avoid duplication
-            // Retrieve the Templates collection from LiteDB
-            RemoveDuplicates(client: this, manifest.Key);
+            // Remove any existing template with the same namespace and key to avoid duplication
+            RemoveDuplicates(client: this, manifest);
 
             // Insert the new or updated template document into the collection
             collection.Insert(document);
@@ -117,7 +117,11 @@ namespace G4.Api.Clients
             collection.DeleteMany(predicate: "_id IN @0", args: new BsonArray(documentsToRemove));
 
             // Remove every persisted template from the same authoritative cache instance after persistence succeeds.
-            foreach (var document in documents.DistinctBy(document => document.Key, StringComparer.OrdinalIgnoreCase))
+            var identities = documents.DistinctBy(
+                keySelector: document => PluginReference.GetQualifiedName(document.Namespace, document.Key),
+                comparer: StringComparer.OrdinalIgnoreCase);
+
+            foreach (var document in identities)
             {
                 RemoveCachedTemplate(_cache, document);
             }
@@ -126,14 +130,13 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public (int StatusCode, IG4PluginManifest Manifest) GetTemplate(string key)
         {
-            // Retrieve documents associated with the provided key from the LiteDatabase
-            var documents = GetDocuments(LiteDatabase, key).Documents;
+            // Retrieve the documents of the template the qualified name, key, or bare name identifies
+            var (statusCode, documents) = SelectDocuments(GetDocuments(LiteDatabase, key).Documents);
 
-            // If no documents are found, return 404 Not Found with a default manifest
-            // Otherwise, return 200 OK with the first found manifest
-            return documents.Length == 0
-                ? (404, default)
-                : (200, documents[0]);
+            // Return the first manifest of the identified template, or the reason it was not identified
+            return statusCode == 200
+                ? (200, documents[0])
+                : (statusCode, default);
         }
 
         /// <inheritdoc />
@@ -153,13 +156,14 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public int RemoveTemplate(string key)
         {
-            // Retrieve the Templates collection from LiteDB
-            var (collection, documents) = GetDocuments(LiteDatabase, key: key);
+            // Retrieve the documents of the template the qualified name, key, or bare name identifies
+            var (collection, candidates) = GetDocuments(LiteDatabase, key);
+            var (statusCode, documents) = SelectDocuments(candidates);
 
-            // If the Templates collection is null, return a 404 Not Found status code
-            if (documents.Length == 0)
+            // Return 404 for a missing template and 409 for a bare name more than one namespace provides
+            if (statusCode != 200)
             {
-                return 404;
+                return statusCode;
             }
 
             // Select the Ids of the documents to be removed and convert them to BsonValue.
@@ -187,8 +191,11 @@ namespace G4.Api.Clients
                 return;
             }
 
-            // Reject an incoming canonical key that currently resolves another capability through an alias.
-            var isKeyLookup = plugins.TryGetValue(cacheModel.Manifest.Key, out var keyModel);
+            // Reject an incoming canonical key that currently resolves another capability of the same namespace
+            // through an alias; the same key in another namespace is a separate identity under its own qualified name.
+            var @namespace = cacheModel.Manifest.Namespace;
+            var qualifiedKey = PluginReference.GetQualifiedName(@namespace, cacheModel.Manifest.Key);
+            var isKeyLookup = plugins.TryGetValue(qualifiedKey, out var keyModel);
             var isCanonicalLookup = isKeyLookup && keyModel.Manifest.Key.Equals(
                 cacheModel.Manifest.Key,
                 StringComparison.OrdinalIgnoreCase);
@@ -200,18 +207,11 @@ namespace G4.Api.Clients
                 throw new InvalidOperationException(message);
             }
 
-            // Reject the known flat-cache limitation when the same physical key represents another namespace.
-            if (isCanonicalLookup && !TestSameNamespace(keyModel.Manifest.Namespace, cacheModel.Manifest.Namespace))
-            {
-                var message = $"Template key '{cacheModel.Manifest.Key}' is already registered under namespace " +
-                    $"'{GetNormalizedNamespace(keyModel.Manifest.Namespace)}'.";
-                throw new InvalidOperationException(message);
-            }
-
-            // Reject aliases that would replace another model's canonical cache entry.
+            // Reject aliases that would replace the canonical cache entry of another model in the same namespace.
             foreach (var alias in cacheModel.Manifest.Aliases ?? [])
             {
-                var isAliasLookup = plugins.TryGetValue(alias, out var aliasModel);
+                var qualifiedAlias = PluginReference.GetQualifiedName(@namespace, alias);
+                var isAliasLookup = plugins.TryGetValue(qualifiedAlias, out var aliasModel);
                 var isOtherCanonical = isAliasLookup &&
                     !ReferenceEquals(aliasModel, keyModel) &&
                     aliasModel.Manifest.Key.Equals(alias, StringComparison.OrdinalIgnoreCase);
@@ -225,23 +225,38 @@ namespace G4.Api.Clients
             }
         }
 
-        // Retrieves a single ApplicationParametersModel document from the specified LiteDatabase collection based on the provided environment name.
-        private static (ILiteCollection<G4PluginAttribute> Collection, G4PluginAttribute[] Documents) GetDocuments(ILiteDatabase liteDatabase, string key)
+        // Retrieves the persisted documents of the templates a reference, written as [Namespace:]Key, refers to. A
+        // qualified reference matches its own namespace only, a bare reference matches its key in every namespace, and
+        // a reference without a key matches nothing. Namespaces are matched in memory because an omitted namespace
+        // normalizes to G4.System.
+        private static (ILiteCollection<G4PluginAttribute> Collection, G4PluginAttribute[] Documents) GetDocuments(
+            ILiteDatabase liteDatabase,
+            string reference)
         {
             const StringComparison Comparison = StringComparison.OrdinalIgnoreCase;
 
-            // Retrieve the collection for ApplicationParametersModel using the predefined collection name and GUID auto ID.
+            // Retrieve the templates collection using the predefined collection name and GUID auto ID.
             var collection = liteDatabase.GetCollection<G4PluginAttribute>(
                 name: CollectionName,
                 autoId: BsonAutoId.Guid);
 
-            // Search for a document where the Name property matches the provided name, ignoring case.
-            // Return the first matching document or null if no match is found.
+            // A reference without a key cannot name a template.
+            var isReference = !string.IsNullOrWhiteSpace(reference) &&
+                !reference.TrimEnd().EndsWith(PluginReference.Separator);
+
+            if (!isReference)
+            {
+                return (collection, []);
+            }
+
+            // Search the key in storage, then keep only the namespace a qualified reference names.
+            var pluginReference = PluginReference.Parse(reference);
+            var key = pluginReference.Key;
             var documents = collection
                 .Find(i => i.Type.Equals(nameof(IG4PluginManifest), Comparison) && i.Key.Equals(key, Comparison))
+                .Where(i => !pluginReference.IsQualified || TestSameNamespace(i.Namespace, pluginReference.Namespace))
                 .ToArray();
 
-            // Return the collection and document as a tuple
             return (collection, documents);
         }
 
@@ -250,7 +265,7 @@ namespace G4.Api.Clients
         {
             // Preserve explicit namespaces while assigning omitted templates to G4.System.
             return string.IsNullOrEmpty(@namespace)
-                ? "G4.System"
+                ? PluginReference.SystemNamespace
                 : @namespace;
         }
 
@@ -258,12 +273,10 @@ namespace G4.Api.Clients
         // A later non-template replacement remains untouched, while normal removals publish through CacheManager.
         private static void RemoveCachedTemplate(CacheManager cache, IG4PluginManifest manifest)
         {
-            // Stop when the Action bucket or physical key is already absent from the authoritative cache.
-            var isActionBucket = cache.PluginsCache.TryGetValue("Action", out var plugins);
-            var cacheModel = default(G4PluginCacheModel);
-            var isCached = isActionBucket && plugins.TryGetValue(manifest.Key, out cacheModel);
+            // Stop when the template's qualified name is already absent from the authoritative cache.
+            var qualifiedName = PluginReference.GetQualifiedName(manifest.Namespace, manifest.Key);
 
-            if (!isCached)
+            if (!cache.TryResolvePlugin(pluginType: "Action", reference: qualifiedName, out var cacheModel))
             {
                 return;
             }
@@ -278,7 +291,30 @@ namespace G4.Api.Clients
             }
 
             // Remove the canonical model and every owned alias through the synchronous event-producing operation.
-            cache.RemoveCacheEntity(entityType: "Action", entityKey: manifest.Key);
+            cache.RemoveCacheEntity(entityType: "Action", entityKey: qualifiedName);
+        }
+
+        // Selects the documents of the one template that a set of matches identifies, following the cache's
+        // precedence for a bare name: the G4.System template when one matches, otherwise the only namespace that
+        // matches. Returns 404 when nothing matches and 409 when more than one other namespace matches.
+        private static (int StatusCode, G4PluginAttribute[] Documents) SelectDocuments(G4PluginAttribute[] documents)
+        {
+            // Group the matches by namespace; a qualified reference yields at most one group.
+            var identities = documents
+                .GroupBy(keySelector: i => GetNormalizedNamespace(i.Namespace), StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (identities.Length < 2)
+            {
+                return identities.Length == 0 ? (404, []) : (200, [.. identities[0]]);
+            }
+
+            // A bare name resolves to the system template; without one, the caller must qualify the name.
+            var systemIdentity = identities.FirstOrDefault(i => i.Key.Equals(
+                PluginReference.SystemNamespace,
+                StringComparison.OrdinalIgnoreCase));
+
+            return systemIdentity == null ? (409, []) : (200, [.. systemIdentity]);
         }
 
         // Tests whether two manifests represent the same normalized namespace-plus-key logical identity.

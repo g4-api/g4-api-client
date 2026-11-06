@@ -28,13 +28,19 @@ namespace G4.Api.Abstractions
         /// <summary>
         /// Retrieves a plugin template based on the provided key.
         /// </summary>
-        /// <param name="key">The unique identifier for the plugin template.</param>
+        /// <param name="key">
+        /// The qualified name (<c>Namespace:Key</c>) or the bare key of the plugin template. A bare key that more than
+        /// one namespace provides selects the <c>G4.System</c> template, if one exists.
+        /// </param>
         /// <returns>
         /// A tuple containing the status code of the operation and the retrieved plugin manifest.
         /// If the template is found, <paramref name="StatusCode"/> is <see cref="StatusCodes.Status200OK"/>
         /// and <paramref name="Manifest"/> contains the plugin manifest.
         /// If the template is not found, <paramref name="StatusCode"/> is <see cref="StatusCodes.Status404NotFound"/>
         /// and <paramref name="Manifest"/> is <c>null</c>.
+        /// If a bare key is provided by more than one namespace and none is <c>G4.System</c>,
+        /// <paramref name="StatusCode"/> is <see cref="StatusCodes.Status409Conflict"/> and <paramref name="Manifest"/>
+        /// is <c>null</c>.
         /// </returns>
         public (int StatusCode, IG4PluginManifest Manifest) GetTemplate(string key);
 
@@ -50,11 +56,16 @@ namespace G4.Api.Abstractions
         /// <summary>
         /// Removes a plugin template identified by the specified key from the LiteDB database.
         /// </summary>
-        /// <param name="key">The unique identifier for the plugin template to be removed.</param>
+        /// <param name="key">
+        /// The qualified name (<c>Namespace:Key</c>) or the bare key of the plugin template to be removed. A bare key
+        /// that more than one namespace provides selects the <c>G4.System</c> template, if one exists.
+        /// </param>
         /// <returns>
         /// An integer representing the status code of the operation.
         /// Returns <see cref="StatusCodes.Status204NoContent"/> if the template is successfully removed,
-        /// or <see cref="StatusCodes.Status404NotFound"/> if the template or the templates collection is not found.
+        /// <see cref="StatusCodes.Status404NotFound"/> if the template or the templates collection is not found,
+        /// or <see cref="StatusCodes.Status409Conflict"/> if a bare key is provided by more than one namespace and none
+        /// is <c>G4.System</c>.
         /// </returns>
         public int RemoveTemplate(string key);
     }

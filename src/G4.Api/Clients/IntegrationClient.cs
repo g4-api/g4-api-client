@@ -178,7 +178,7 @@ namespace G4.Api.Clients
             SyncCache(_cache, repository);
 
             // Attempt to retrieve the document again after cache synchronization.
-            return GetDocument(key);
+            return GetDocument(pluginType, key);
         }
 
         /// <inheritdoc />
@@ -187,8 +187,8 @@ namespace G4.Api.Clients
             // Iterate through all plugin types available in the plugins cache.
             foreach (var pluginType in _cache.PluginsCache.Keys)
             {
-                // Attempt to retrieve the cache model for the given key within the current plugin type.
-                if (_cache.PluginsCache[pluginType].TryGetValue(key, out G4PluginCacheModel cacheModel))
+                // Resolve the qualified name, key, or alias within the current plugin type.
+                if (_cache.TryResolvePlugin(pluginType, reference: key, out var cacheModel))
                 {
                     return cacheModel.Document;
                 }
@@ -201,11 +201,8 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public string GetDocument(string pluginType, string key)
         {
-            // Attempt to retrieve the plugins dictionary for the specified plugin type.
-            var isType = _cache.PluginsCache.TryGetValue(pluginType, out ConcurrentDictionary<string, G4PluginCacheModel> plugins);
-
-            // If the plugin type exists, attempt to retrieve the cache model for the given key.
-            var isPlugin = plugins.TryGetValue(key, out G4PluginCacheModel cacheModel) && isType;
+            // Resolve the qualified name, key, or alias within the plugin type; a missing type resolves to nothing.
+            var isPlugin = _cache.TryResolvePlugin(pluginType, reference: key, out var cacheModel);
 
             // Return the document if the plugin is found, otherwise return an empty string.
             return isPlugin ? cacheModel.Document : string.Empty;
@@ -284,8 +281,8 @@ namespace G4.Api.Clients
             // Iterate through all plugin types available in the plugins cache.
             foreach (var pluginType in _cache.PluginsCache.Keys)
             {
-                // Attempt to retrieve the cache model for the given key within the current plugin type.
-                if (_cache.PluginsCache[pluginType].TryGetValue(key, out G4PluginCacheModel cacheModel))
+                // Resolve the qualified name, key, or alias within the current plugin type.
+                if (_cache.TryResolvePlugin(pluginType, reference: key, out var cacheModel))
                 {
                     // Return the manifest if it was found.
                     return (T)cacheModel.Manifest;
@@ -299,11 +296,8 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public T GetManifest<T>(string pluginType, string key) where T : IG4PluginReference
         {
-            // Attempt to retrieve the plugins dictionary for the specified plugin type.
-            var isType = _cache.PluginsCache.TryGetValue(pluginType, out ConcurrentDictionary<string, G4PluginCacheModel> plugins);
-
-            // If the plugin type exists, attempt to retrieve the cache model for the given key.
-            var isPlugin = plugins.TryGetValue(key, out G4PluginCacheModel cacheModel) && isType;
+            // Resolve the qualified name, key, or alias within the plugin type; a missing type resolves to nothing.
+            var isPlugin = _cache.TryResolvePlugin(pluginType, reference: key, out var cacheModel);
 
             // Return the manifest if the plugin is found, otherwise return the default value (null).
             return isPlugin ? (T)cacheModel.Manifest : default;
@@ -322,11 +316,13 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public IEnumerable<T> GetManifests<T>() where T : IG4PluginReference
         {
-            // Flatten the cache and retrieve all manifests, casting each to the specified type.
+            // Flatten the cache once per model, since a bucket holds each model under its qualified name, key, and
+            // aliases, and cast each manifest to the specified type.
             return _cache
                 .PluginsCache
                 .Values
                 .SelectMany(i => i.Values)
+                .Distinct()
                 .Select(i => (T)i.Manifest);
         }
 
@@ -423,7 +419,7 @@ namespace G4.Api.Clients
                 // pass keeps the last good version of a tool the engine now rejects, as the cache does for a plugin it
                 // refuses to replace.
                 syncedServerUrls.Add(server.Url);
-                AddSyncedEntries(syncedEntries, cacheModels, rejectedToolNames: rejectedTools.Keys);
+                AddSyncedEntries(syncedEntries, serverName: name, cacheModels, rejectedToolNames: rejectedTools.Keys);
             }
 
             // Remove plugins of servers that are no longer configured, and plugins a synchronized server dropped.
@@ -470,19 +466,22 @@ namespace G4.Api.Clients
         // the replacement. Adds to the caller's set and changes nothing else.
         private static void AddSyncedEntries(
             HashSet<string> syncedEntries,
+            string serverName,
             IEnumerable<G4PluginCacheModel> cacheModels,
             IEnumerable<string> rejectedToolNames)
         {
-            // Every plugin the server provided, under its own plugin type and key.
+            // Every plugin the server provided, under its own plugin type and qualified name.
             foreach (var cacheModel in cacheModels ?? [])
             {
-                syncedEntries.Add(NewEntryKey(cacheModel.Manifest.PluginType, cacheModel.Manifest.Key));
+                var manifest = cacheModel.Manifest;
+                syncedEntries.Add(NewEntryKey(manifest.PluginType, manifest.Namespace, manifest.Key));
             }
 
-            // Every tool the engine rejected, under the Action type that every MCP tool converts to.
+            // Every tool the engine rejected, under the Action type that every MCP tool converts to and the server
+            // name that the engine gives every MCP tool as its namespace.
             foreach (var rejectedToolName in rejectedToolNames ?? [])
             {
-                syncedEntries.Add(NewEntryKey(McpPluginType, rejectedToolName));
+                syncedEntries.Add(NewEntryKey(McpPluginType, serverName, rejectedToolName));
             }
         }
 
@@ -540,8 +539,12 @@ namespace G4.Api.Clients
             return cacheData;
         }
 
-        // Builds the key that identifies one plugin across servers: its plugin type and canonical key.
-        private static string NewEntryKey(string pluginType, string key) => $"{pluginType}/{key}";
+        // Builds the key that identifies one plugin across servers: its plugin type and qualified name, so the same
+        // tool name on two servers stays two entries.
+        private static string NewEntryKey(string pluginType, string @namespace, string key)
+        {
+            return $"{pluginType}/{PluginReference.GetQualifiedName(@namespace, key)}";
+        }
 
         // Combines the rejections of one server into the dictionary its sync result reports: the tools the engine
         // could not convert, then the plugins the cache refused. The keys never overlap, since a tool that was not
@@ -615,7 +618,9 @@ namespace G4.Api.Clients
             {
                 try
                 {
-                    cache.RemoveCacheEntity(pluginType, model.Manifest.Key);
+                    // Remove by qualified name, which names this plugin even when another server shares its key.
+                    var qualifiedName = PluginReference.GetQualifiedName(model.Manifest.Namespace, model.Manifest.Key);
+                    cache.RemoveCacheEntity(pluginType, entityKey: qualifiedName);
                 }
                 catch (Exception exception)
                 {
@@ -640,7 +645,8 @@ namespace G4.Api.Clients
 
                 // A plugin of a server that answered is stale when the server no longer provides it.
                 return options.SyncedServerUrls.Contains(serverUrl)
-                    && !options.SyncedEntries.Contains(NewEntryKey(pluginType, model.Manifest.Key));
+                    && !options.SyncedEntries.Contains(
+                        NewEntryKey(pluginType, model.Manifest.Namespace, model.Manifest.Key));
             }
         }
 
@@ -665,10 +671,12 @@ namespace G4.Api.Clients
                 {
                     cache.SyncCache(cacheModel);
 
-                    // The engine accepted the plugin when the cache now holds this very model under its key.
+                    // The engine accepted the plugin when its qualified name now resolves to this very model; the bare
+                    // key is not used, because another namespace providing the same key withdraws it.
                     var pluginType = cacheModel?.Manifest?.PluginType ?? string.Empty;
-                    var isAccepted = cache.PluginsCache.TryGetValue(pluginType, out var bucket)
-                        && bucket.TryGetValue(key, out var cachedModel)
+                    var qualifiedName = PluginReference.GetQualifiedName(cacheModel?.Manifest?.Namespace, key);
+                    var isAccepted = !string.IsNullOrEmpty(key)
+                        && cache.TryResolvePlugin(pluginType, reference: qualifiedName, out var cachedModel)
                         && ReferenceEquals(cachedModel, cacheModel);
 
                     if (isAccepted)

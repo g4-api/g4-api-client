@@ -153,28 +153,99 @@ namespace G4.UnitTests.Engine
             Assert.IsTrue(notifications.All(i => i.ChangeType == CacheManager.CacheChangeTypes.Removed));
         }
 
-        [TestMethod(DisplayName = "Verify that a namespace collision is rejected before template persistence changes.")]
-        public void NamespaceCollisionLeavesPersistenceAndCacheUnchangedTest()
+        [TestMethod(DisplayName = "Verify that a template key another namespace already provides is registered under " +
+            "its own qualified name.")]
+        public void SameKeyAcrossNamespacesRegistersBothTest()
         {
-            // Arrange: reserve the physical key under another namespace without creating a persisted template.
-            const string Key = "UnitTestTemplateNamespaceConflict";
+            // Arrange: reserve the key under another namespace without creating a persisted template.
+            const string Key = "UnitTestTemplateNamespaceShared";
+            const string OtherNamespace = "G4.UnitTests.Existing";
             var cacheManager = NewCacheManager();
             var client = new G4Client(cacheManager);
             CleanupTemplate(client, Key);
             var existingModel = NewCacheModel(Key, "existing namespace phrase");
-            existingModel.Manifest.Namespace = "G4.UnitTests.Existing";
+            existingModel.Manifest.Namespace = OtherNamespace;
             cacheManager.SyncCache(existingModel);
-            var notifications = new List<CacheManager.CacheChangedEventArgs>();
-            cacheManager.CacheChanged += (_, eventArgs) => notifications.Add(eventArgs);
-            var conflictingManifest = NewManifest(Key, "conflicting namespace phrase");
 
-            // Act: attempt to persist another logical identity that cannot coexist in the flat Action bucket.
-            _ = Assert.ThrowsExactly<InvalidOperationException>(() => client.Templates.AddTemplate(conflictingManifest));
+            // Act: persist a template with the same key in the test namespace.
+            var statusCode = client.Templates.AddTemplate(NewManifest(Key, "shared namespace phrase"));
+            var isTemplate = cacheManager.TryResolvePlugin(PluginType, $"{PluginNamespace}:{Key}", out var template);
+            var isExisting = cacheManager.TryResolvePlugin(PluginType, $"{OtherNamespace}:{Key}", out var existing);
 
-            // Assert: preflight rejection leaves both persistence and the existing authoritative cache entry unchanged.
-            Assert.AreEqual(404, client.Templates.GetTemplate(Key).StatusCode);
-            Assert.AreSame(existingModel, cacheManager.PluginsCache[PluginType][Key]);
-            Assert.IsEmpty(notifications);
+            // Assert: both identities resolve by qualified name, and the bare key is withdrawn as ambiguous.
+            Assert.AreEqual(expected: 204, actual: statusCode);
+            Assert.IsTrue(condition: isTemplate);
+            Assert.AreEqual(expected: PluginNamespace, actual: template.Manifest.Namespace);
+            Assert.IsTrue(condition: isExisting);
+            Assert.AreSame(expected: existingModel, actual: existing);
+            Assert.IsFalse(condition: cacheManager.PluginsCache[PluginType].ContainsKey(Key));
+
+            CleanupTemplate(client, $"{PluginNamespace}:{Key}");
+        }
+
+        [TestMethod(DisplayName = "Verify that templates sharing a key in two namespaces are read and removed by " +
+            "qualified name, and that their bare name is reported as ambiguous.")]
+        public void QualifiedNameSelectsTemplateTest()
+        {
+            // Arrange: persist one key in the test namespace and in a second namespace.
+            const string Key = "UnitTestTemplateQualified";
+            const string OtherNamespace = "G4.UnitTests.Templates.Other";
+            var firstName = $"{PluginNamespace}:{Key}";
+            var secondName = $"{OtherNamespace}:{Key}";
+            var cacheManager = NewCacheManager();
+            var client = new G4Client(cacheManager);
+            CleanupTemplate(client, firstName);
+            CleanupTemplate(client, secondName);
+            var secondManifest = NewManifest(Key, "second namespace phrase");
+            secondManifest.Namespace = OtherNamespace;
+            client.Templates.AddTemplate(NewManifest(Key, "first namespace phrase"));
+            client.Templates.AddTemplate(secondManifest);
+
+            // Act: read by bare and qualified name, remove the first template, then read the bare name again.
+            var bareRead = client.Templates.GetTemplate(Key);
+            var bareRemoval = client.Templates.RemoveTemplate(Key);
+            var secondRead = client.Templates.GetTemplate(secondName);
+            var firstRemoval = client.Templates.RemoveTemplate(firstName);
+            var remainingRead = client.Templates.GetTemplate(Key);
+
+            // Assert: the ambiguous bare name changes nothing, and the qualified removal leaves the other namespace.
+            Assert.AreEqual(expected: 409, actual: bareRead.StatusCode);
+            Assert.AreEqual(expected: 409, actual: bareRemoval);
+            Assert.AreEqual(expected: OtherNamespace, actual: secondRead.Manifest.Namespace);
+            Assert.AreEqual(expected: 204, actual: firstRemoval);
+            Assert.AreEqual(expected: 404, actual: client.Templates.GetTemplate(firstName).StatusCode);
+            Assert.AreEqual(expected: OtherNamespace, actual: remainingRead.Manifest.Namespace);
+            Assert.IsTrue(condition: cacheManager.TryResolvePlugin(PluginType, Key, out var remaining));
+            Assert.AreEqual(expected: OtherNamespace, actual: remaining.Manifest.Namespace);
+
+            CleanupTemplate(client, secondName);
+        }
+
+        [TestMethod(DisplayName = "Verify that a bare template name two namespaces provide resolves to the G4.System " +
+            "template.")]
+        public void BareNamePrefersSystemTemplateTest()
+        {
+            // Arrange: persist one key in the system namespace and in the test namespace.
+            const string Key = "UnitTestTemplateSystem";
+            var systemName = $"{PluginReference.SystemNamespace}:{Key}";
+            var cacheManager = NewCacheManager();
+            var client = new G4Client(cacheManager);
+            CleanupTemplate(client, systemName);
+            CleanupTemplate(client, $"{PluginNamespace}:{Key}");
+            var systemManifest = NewManifest(Key, "system namespace phrase");
+            systemManifest.Namespace = null;
+            client.Templates.AddTemplate(systemManifest);
+            client.Templates.AddTemplate(NewManifest(Key, "test namespace phrase"));
+
+            // Act: read the template by its bare name.
+            var (statusCode, manifest) = client.Templates.GetTemplate(Key);
+
+            // Assert: the system template is selected, as the cache selects it for a bare plugin name.
+            Assert.AreEqual(expected: 200, actual: statusCode);
+            Assert.AreEqual(expected: "system namespace phrase", actual: manifest.Summary.First());
+
+            CleanupTemplate(client, systemName);
+            CleanupTemplate(client, $"{PluginNamespace}:{Key}");
         }
 
         [TestMethod(DisplayName = "Verify that a template key cannot overwrite another capability alias.")]
