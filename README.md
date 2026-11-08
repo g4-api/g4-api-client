@@ -1,9 +1,9 @@
 # G4.Api
 
 [![NuGet](https://img.shields.io/nuget/v/g4.api?logo=nuget&logoColor=959da5&label=NuGet&labelColor=24292f)](https://www.nuget.org/packages/g4.Api)
-[![Build, Test & Release](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml/badge.svg)](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml)  
-  
-**G4.Api** is the official client library for the **G4™ Engine**, providing seamless access to automation, environments, integrations, and templates management. Through its intuitive interfaces, you can quickly leverage the robust features of G4 to build, run, and manage automation workflows, environment parameters, and plugin integrations.
+[![Build, Test & Release](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml/badge.svg)](https://github.com/g4-api/g4-api-client/actions/workflows/release-pipeline.yml)
+
+**G4.Api** is the official client library for the **G4â„¢ Engine**, providing seamless access to automation, environments, integrations, and templates management. Through its intuitive interfaces, you can quickly leverage the robust features of G4 to build, run, and manage automation workflows, environment parameters, and plugin integrations.
 
 ---
 
@@ -20,20 +20,20 @@
 
 ## Features
 
-1. **Automation Management**  
-   - Invoking, tracking, and customizing automated workflows.  
+1. **Automation Management**
+   - Invoking, tracking, and customizing automated workflows.
    - Handling job, rule, and stage-level events and callbacks.
 
-2. **Environments Management**  
-   - Creating, deleting, and updating environment-specific parameters.  
+2. **Environments Management**
+   - Creating, deleting, and updating environment-specific parameters.
    - Decoding and encoding parameters for secure storage and retrieval.
 
-3. **Integrations**  
-   - Centralized management of external repositories and plugin metadata.  
+3. **Integrations**
+   - Centralized management of external repositories and plugin metadata.
    - Cached retrieval of plugin documents, manifests, and other artifacts.
 
-4. **Templates**  
-   - Adding and removing plugin templates for reuse in automation scenarios.  
+4. **Templates**
+   - Adding and removing plugin templates for reuse in automation scenarios.
    - Maintaining a dedicated LiteDB collection for template management.
 
 ---
@@ -66,26 +66,38 @@ Or by adding it directly in your `.csproj` file:
 
 ## Getting Started
 
-1. **Reference the Library**  
-   Add a reference to `G4.Api` in your .NET project. Ensure you have at least .NET 6 or higher (the library targets .NET 8.0).
+### 1. Reference the library
 
-2. **Create and Configure a G4Client**  
-   ```csharp
-   using G4.Api;
+Add a reference to `G4.Api` in your .NET project. The library targets `net10.0`, so your project needs the .NET 10 SDK or a compatible target framework.
 
-   var g4Client = new G4Client();
-   ```
+### 2. Create a G4Client
 
-3. **Explore Clients**  
-   - **Automation**: `g4Client.Automation`  
-   - **Environments**: `g4Client.Environments`  
-   - **Integration**: `g4Client.Integration`  
-   - **Templates**: `g4Client.Templates`  
+```csharp
+using G4.Api;
 
-4. **Start Automating!**  
-   - Create or fetch environment parameters.  
-   - Add or remove plugin templates.  
-   - Invoke automations and handle events such as `RuleInvoking`, `JobInvoked`, and more.
+var g4Client = new G4Client();
+```
+
+### 3. Explore the clients
+
+`G4Client` exposes these public properties:
+
+| Property | Type | What it does |
+| --- | --- | --- |
+| `Automation` | `IAutomationClient` | Manages and invokes automations. |
+| `AutomationAsync` | `IAutomationAsyncClient` | Manages and invokes automations asynchronously, using an `IQueueManager`. |
+| `Credentials` | `ICredentialsClient` | Manages credentials. |
+| `Environments` | `IEnvironmentsClient` | Manages environments and their parameters. |
+| `Flows` | `IFlowsClient` | Manages and invokes flows: complete automations persisted and cached by namespace and key. |
+| `Integration` | `IIntegrationClient` | Handles integrations. |
+| `Logger` | `ILogger` | The logger instance used by the client. |
+| `Templates` | `ITemplateClient` | Manages plugin templates. |
+
+### 4. Start automating
+
+- Create or fetch environment parameters.
+- Add or remove plugin templates.
+- Invoke automations and handle events such as `RuleInvoking`, `JobInvoked`, and more.
 
 ---
 
@@ -127,14 +139,16 @@ foreach (var result in results)
 
 > **Note:** This snippet is purely illustrative and may be modified to fit real-world scenarios.
 
+For the full walkthrough, with a compiled `G4AutomationModel` sample, the event list, the queue manager and flows, read [Embed G4 in a .NET application](docs/embed-g4-in-dotnet.md).
+
 ---
 
 ## Contributing
 
-1. **Fork** this repository and clone your fork.  
-2. Create a **feature branch** (e.g., `feature/awesome-new-feature`).  
-3. **Commit** your changes and push them to your fork.  
-4. Open a **Pull Request** against the `main` branch of this repository.  
+1. **Fork** this repository and clone your fork.
+2. Create a **feature branch** (e.g., `feature/awesome-new-feature`).
+3. **Commit** your changes and push them to your fork.
+4. Open a **Pull Request** against the `main` branch of this repository.
 
 We welcome contributions of all types - bug reports, fixes, new features, documentation updates, etc. Please make sure to follow the project's code style and standards.
 
@@ -143,3 +157,7 @@ We welcome contributions of all types - bug reports, fixes, new features, docume
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE). By contributing to **G4.Api**, you agree that your contributions will be licensed under its Apache 2.0 License.
+
+## Contributing and builds
+
+Build tools, test commands, version numbers, Docker images and development ports are in the [build, test and release guide](../g4-github-actions/docs/build-test-release.md).
