@@ -2,6 +2,7 @@ using G4.Api;
 using G4.Api.Abstractions;
 using G4.Attributes;
 using G4.Cache;
+using G4.Credentials.Models;
 using G4.Models;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -53,6 +54,102 @@ namespace G4.UnitTests.Engine
             Assert.HasCount(2, syncedEntries);
             Assert.Contains($"{PluginType}/G4.System:ProvidedPlugin", syncedEntries);
             Assert.Contains("Action/UnitTestServer:RejectedTool", syncedEntries);
+        }
+
+        [TestMethod(DisplayName = "Verify that the cached credential lookup finds a record of any credential type by " +
+            "its identifier or name, case-insensitively, and returns its concrete model.")]
+        #region *** Data Set ***
+        [DataRow("cred_sql_unit_test_lookup")]
+        [DataRow("CRED_SQL_UNIT_TEST_LOOKUP")]
+        [DataRow("unit-test-sql-lookup")]
+        [DataRow("Unit-Test-SQL-Lookup")]
+        #endregion
+        public void GetCredentialsFindsAnyCredentialTypeTest(string idOrName)
+        {
+            // Arrange: cache one SQL Server record beside one OAuth record in a private cache.
+            var cacheManager = NewCacheManager();
+            var client = NewIntegrationClient(cacheManager);
+            var sqlServer = new SqlServerCredentialModel { Id = "cred_sql_unit_test_lookup", Name = "unit-test-sql-lookup" };
+            var oauth = new OAuthCredentialModel { Id = "cred_oauth_unit_test_lookup", Name = "unit-test-oauth-lookup" };
+            AddCredential(cacheManager, credential: sqlServer);
+            AddCredential(cacheManager, credential: oauth);
+
+            // Act: look the SQL Server record up by the identifier or name of the data row.
+            var credential = client.GetCredentials(idOrName);
+
+            // Assert: the SQL Server record itself is returned as its concrete model.
+            Assert.AreSame(expected: sqlServer, actual: credential);
+            Assert.AreEqual(expected: CredentialTypes.SqlServer, actual: credential.CredentialType);
+        }
+
+        [TestMethod(DisplayName = "Verify that the cached credential lookup returns null when no record matches, or " +
+            "when the identifier or name is empty.")]
+        #region *** Data Set ***
+        [DataRow("unit-test-missing-credential")]
+        [DataRow("")]
+        [DataRow(null)]
+        #endregion
+        public void GetCredentialsMissingRecordTest(string idOrName)
+        {
+            // Arrange: cache one record whose identity never matches the data row.
+            var cacheManager = NewCacheManager();
+            var client = NewIntegrationClient(cacheManager);
+            AddCredential(cacheManager, credential: new SqlServerCredentialModel
+            {
+                Id = "cred_sql_unit_test_missing",
+                Name = "unit-test-sql-missing"
+            });
+
+            // Act: look up a value that matches no cached record.
+            var credential = client.GetCredentials(idOrName);
+
+            // Assert: the lookup reports the missing record as null instead of throwing.
+            Assert.IsNull(value: credential);
+        }
+
+        [TestMethod(DisplayName = "Verify that the cached credentials are returned as the live type-partitioned cache, " +
+            "with one partition per known credential type.")]
+        public void GetCredentialsReturnsPartitionsTest()
+        {
+            // Arrange: cache one SQL Server record in a private cache.
+            var cacheManager = NewCacheManager();
+            var client = NewIntegrationClient(cacheManager);
+            var sqlServer = new SqlServerCredentialModel { Id = "cred_sql_unit_test_all", Name = "unit-test-sql-all" };
+            AddCredential(cacheManager, credential: sqlServer);
+
+            // Act: read every cached credential.
+            var credentials = client.GetCredentials();
+
+            // Assert: the live cache is returned, every known type has a partition, and the record sits in its own.
+            Assert.AreSame(expected: cacheManager.CredentialsCache, actual: credentials);
+            Assert.IsTrue(condition: credentials.ContainsKey(key: CredentialTypes.OAuth));
+            Assert.IsTrue(condition: credentials.ContainsKey(key: CredentialTypes.SqlServer));
+            var cached = credentials[CredentialTypes.SqlServer]["unit-test-sql-all;cred_sql_unit_test_all"];
+            Assert.AreSame(expected: sqlServer, actual: cached);
+        }
+
+        [TestMethod(DisplayName = "Verify that the cached credential lookup prefers an identifier match over a name " +
+            "match, and resolves a name shared by two credential types to the type first in ordinal name order.")]
+        public void GetCredentialsSharedNameTest()
+        {
+            // Arrange: cache an OAuth and a SQL Server record under the same name, and a record named after the
+            // identifier of the SQL Server record.
+            var cacheManager = NewCacheManager();
+            var client = NewIntegrationClient(cacheManager);
+            var oauth = new OAuthCredentialModel { Id = "cred_oauth_unit_test_shared", Name = "unit-test-shared" };
+            var sqlServer = new SqlServerCredentialModel { Id = "cred_sql_unit_test_shared", Name = "unit-test-shared" };
+            var nameTwin = new OAuthCredentialModel { Id = "cred_oauth_unit_test_twin", Name = "cred_sql_unit_test_shared" };
+            AddCredential(cacheManager, credential: sqlServer);
+            AddCredential(cacheManager, credential: oauth);
+            AddCredential(cacheManager, credential: nameTwin);
+
+            // Act: look the records up by the shared name and by the identifier the name twin also uses as its name.
+            var byName = client.GetCredentials(idOrName: "unit-test-shared");
+            var byId = client.GetCredentials(idOrName: "cred_sql_unit_test_shared");
+
+            // Assert: the shared name resolves to the OAuth record, and the identifier wins over the name twin.
+            Assert.AreSame(expected: oauth, actual: byName);
+            Assert.AreSame(expected: sqlServer, actual: byId);
         }
 
         [TestMethod(DisplayName = "Verify that the manifest and document lookups accept a qualified name, and that a " +
@@ -275,6 +372,15 @@ namespace G4.UnitTests.Engine
             var manifest = model.Manifest;
             bucket[PluginReference.GetQualifiedName(manifest.Namespace, manifest.Key)] = model;
             bucket[manifest.Key] = model;
+        }
+
+        // Caches a credential record in the partition of its credential type, under the lower-case name;id key the
+        // engine cache builder composes.
+        private static void AddCredential(CacheManager cacheManager, CredentialModelBase credential)
+        {
+            // Write the record into the partition the engine keeps for its type.
+            var key = $"{credential.Name};{credential.Id}".ToLowerInvariant();
+            cacheManager.CredentialsCache[credential.CredentialType][key] = credential;
         }
 
         // Finds a local port with nothing listening on it, so a connection to it is refused at once.
