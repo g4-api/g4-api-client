@@ -125,19 +125,22 @@ namespace G4.Api.Clients
         }
 
         /// <inheritdoc />
-        public OAuthCredentialModel GetCredentials(string idOrName)
+        public CredentialModelBase GetCredentials(string idOrName)
         {
-            const StringComparison comparison = StringComparison.OrdinalIgnoreCase;
+            // Flatten the partitions in ordinal type-name order, so a name shared by two credential types resolves
+            // to the same record on every call regardless of the partition order of the cache.
+            var credentials = _cache.CredentialsCache
+                .OrderBy(i => i.Key, comparer: StringComparer.OrdinalIgnoreCase)
+                .SelectMany(i => i.Value.Values);
 
-            return _cache
-                .CredentialsCache
-                .Values
-                .FirstOrDefault(i => i.Id.Equals(idOrName, comparison) || i.Name.Equals(idOrName, comparison));
+            // Resolve the record by identifier first and by name second; a missing record yields null.
+            return FindCredential(credentials, idOrName);
         }
 
         /// <inheritdoc />
-        public IDictionary<string, OAuthCredentialModel> GetCredentials()
+        public IDictionary<string, IDictionary<string, CredentialModelBase>> GetCredentials()
         {
+            // Expose the live type-partitioned cache; a cache synchronization replaces it with a new instance.
             return _cache.CredentialsCache;
         }
 
@@ -483,6 +486,26 @@ namespace G4.Api.Clients
             {
                 syncedEntries.Add(NewEntryKey(McpPluginType, serverName, rejectedToolName));
             }
+        }
+
+        // Resolves one credential record from the specified records: an identifier match wins over a name match, both
+        // compared case-insensitively, and the first match in the sequence order wins. An empty identifier or name
+        // matches nothing, so a missing route value never resolves to a record.
+        private static CredentialModelBase FindCredential(IEnumerable<CredentialModelBase> credentials, string idOrName)
+        {
+            // Reject an empty lookup value before reading the records.
+            if (string.IsNullOrEmpty(idOrName))
+            {
+                return null;
+            }
+
+            // Materialize the records once so the identifier pass and the name pass read the same snapshot.
+            const StringComparison comparison = StringComparison.OrdinalIgnoreCase;
+            var candidates = credentials.ToArray();
+
+            // Prefer the identifier, which is unique, and fall back to the name, which two types can share.
+            return candidates.FirstOrDefault(i => string.Equals(a: i.Id, b: idOrName, comparisonType: comparison))
+                ?? candidates.FirstOrDefault(i => string.Equals(a: i.Name, b: idOrName, comparisonType: comparison));
         }
 
         // Scans all cached types for those decorated with G4DriverPluginAttribute and aggregates them

@@ -30,17 +30,31 @@ namespace G4.Api.Abstractions
         IDictionary<string, ConcurrentDictionary<string, G4PluginCacheModel>> GetCache();
 
         /// <summary>
-        /// Retrieves a single <see cref="OAuthCredentialModel"/> by its identifier or name.
+        /// Retrieves a single cached credential record of any known credential type by its identifier or name.
         /// </summary>
+        /// <remarks>
+        /// The lookup reads the credentials cache, not the persistent store, so a record saved since the last cache
+        /// synchronization is not found. An identifier match wins over a name match. When records of two types share
+        /// the name, the record of the type that comes first in ordinal type-name order wins.
+        /// </remarks>
         /// <param name="idOrName">The unique identifier or logical name of the credential.</param>
-        /// <returns>The matching <see cref="OAuthCredentialModel"/>.</returns>
-        OAuthCredentialModel GetCredentials(string idOrName);
+        /// <returns>
+        /// The matching record as its concrete model, such as <see cref="OAuthCredentialModel"/> or
+        /// <see cref="SqlServerCredentialModel"/>; otherwise <c>null</c>.
+        /// </returns>
+        CredentialModelBase GetCredentials(string idOrName);
 
         /// <summary>
-        /// Retrieves all stored <see cref="OAuthCredentialModel"/> entries.
+        /// Retrieves the credentials cache, grouped by credential type.
         /// </summary>
-        /// <returns>A dictionary where the keys are credential identifiers and names, and the values are the corresponding <see cref="OAuthCredentialModel"/> instances.</returns>
-        IDictionary<string, OAuthCredentialModel> GetCredentials();
+        /// <remarks>
+        /// The returned dictionary is the live cache instance, with one partition per known credential type.
+        /// </remarks>
+        /// <returns>
+        /// A dictionary keyed by credential type (see <see cref="CredentialTypes"/>), where each value maps the
+        /// lower-case <c>name;id</c> key of a record to the record.
+        /// </returns>
+        IDictionary<string, IDictionary<string, CredentialModelBase>> GetCredentials();
 
         /// <summary>
         /// Retrieves the document associated with the specified key. If the document is not found in the cache,

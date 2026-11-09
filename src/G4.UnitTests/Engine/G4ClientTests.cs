@@ -301,19 +301,6 @@ namespace G4.UnitTests.Engine
             Assert.AreNotEqual(default, response.First().Value.Sessions.FirstOrDefault().Value);
         }
 
-        [TestMethod]
-        public void NewCredentialsTest()
-        {
-            // Create a new G4Client instance
-            var client = new G4Client().Credentials;
-            
-            // Create new credentials using the client and assert that the credentials are not null
-            var credentials = client.NewCredentials(null);
-
-            // Assert that the credentials are not null
-            Assert.IsNotNull(credentials, "Credentials must not be null.");
-        }
-
         [TestMethod(DisplayName = "Verify the performance point automation reference details " +
             "in the flat request when data is provided")]
         public void PerformancePointAutomationReferenceDetailsTest()

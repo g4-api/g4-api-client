@@ -12,7 +12,7 @@ using System.Linq;
 namespace G4.Api.Clients
 {
     /// <summary>
-    /// Provides credential persistence and caching capabilities for OAuth and related credential types.
+    /// Provides credential persistence and caching capabilities for every known credential type.
     /// </summary>
     internal class CredentialsClient : ClientBase, ICredentialsClient
     {
@@ -55,21 +55,40 @@ namespace G4.Api.Clients
 
         #region *** Methods      ***
         /// <inheritdoc />
-        public OAuthCredentialModel GetCredentials(string idOrName)
+        public CredentialModelBase GetCredentials(string idOrName)
         {
-            // Get credentials from the underlying credentials database manager.
-            // This will not use the cache, as credentials may be updated or created outside of this client.
-            return _credentials.GetCredentials(idOrName);
+            // Reject an empty lookup value before querying the store, which binds it as a command parameter.
+            if (string.IsNullOrEmpty(idOrName))
+            {
+                return null;
+            }
+
+            // Query the store of every credential type, not the cache, as records may be created or changed outside
+            // of this client. The types are listed in ordinal type-name order, which decides a shared name.
+            CredentialModelBase[] credentials =
+            [
+                _credentials.GetCredentials(idOrName),
+                _credentials.GetSqlServerCredentials(idOrName)
+            ];
+
+            // Resolve the record by identifier first and by name second among the records that were found.
+            return FindCredential(credentials: credentials.Where(i => i != null), idOrName);
         }
 
         /// <inheritdoc />
-        public IDictionary<string, OAuthCredentialModel> GetCredentials()
+        public IDictionary<string, IDictionary<string, CredentialModelBase>> GetCredentials()
         {
-            // Get all credentials from the underlying credentials database manager.
-            // This will not use the cache, as credentials may be updated or created outside of this client.
-            return _credentials
-                .GetCredentials()
-                .ToDictionary(i => ($"{i.Name};{i.Id}".ToLower()), i => i);
+            // Read every record of every credential type from the store, not the cache, as records may be created or
+            // changed outside of this client.
+            IEnumerable<CredentialModelBase> credentials =
+            [
+                .. _credentials.GetCredentials(),
+                .. _credentials.GetSqlServerCredentials()
+            ];
+
+            // Group the records with the engine cache builder, so the result has the exact partitions and keys of the
+            // credentials cache, including empty partitions.
+            return CacheManager.NewCredentialsCache(credentials);
         }
 
         /// <inheritdoc />
@@ -82,25 +101,34 @@ namespace G4.Api.Clients
         /// <inheritdoc />
         public int RemoveCredentials(string idOrName)
         {
-            // Resolve the credential so we can compute the cache key
-            var credentials = _credentials.GetCredentials(idOrName);
+            // Resolve the record of any credential type, so the delete targets its table and its cache partition.
+            var credential = GetCredentials(idOrName);
 
             // No credential found matching the provided identifier or name, so return 0 records removed.
-            if (credentials == null) {
+            if (credential == null)
+            {
                 return 0;
             }
 
-            // Remove from persistent store
-            var removedCount = _credentials.RemoveCredentials(idOrName: credentials.Id);
+            // Remove the record from the table of its credential type, addressed by its unique identifier; a type
+            // without a table in the store has no rows to remove.
+            var removedCount = credential switch
+            {
+                OAuthCredentialModel => _credentials.RemoveCredentials(idOrName: credential.Id),
+                SqlServerCredentialModel => _credentials.RemoveSqlServerCredentials(idOrName: credential.Id),
+                _ => 0
+            };
 
-            // Build normalized cache key (Name + Id, case-insensitive)
-            // Using invariant lowercase to ensure consistent dictionary access
-            var key = $"{credentials.Name};{credentials.Id}".ToLowerInvariant();
+            // Build the normalized cache key (Name + Id, case-insensitive) the engine cache builder uses.
+            var key = $"{credential.Name};{credential.Id}".ToLowerInvariant();
 
-            // Remove from in-memory cache if it exists
-            _cache.CredentialsCache.Remove(key);
+            // Remove the record from the cache partition of its credential type, when the partition exists.
+            if (_cache.CredentialsCache.TryGetValue(key: credential.CredentialType, value: out var partition))
+            {
+                partition.Remove(key);
+            }
 
-            // Return the number of records removed from the persistent store
+            // Return the number of records removed from the persistent store.
             return removedCount;
         }
 
@@ -115,11 +143,25 @@ namespace G4.Api.Clients
             // Using invariant lowercase to ensure consistent dictionary access
             var key = $"{credentials.Name};{credentials.Id}".ToLowerInvariant();
 
-            // Store in in-memory cache for fast lookup
-            _cache.CredentialsCache[key] = credentials;
+            // Store the record in the OAuth partition of the in-memory cache for fast lookup; every known credential
+            // type always has a partition.
+            _cache.CredentialsCache[CredentialTypes.OAuth][key] = credentials;
 
             // Return the persisted credentials to the caller
             return credentials;
+        }
+
+        // Resolves one credential record from the specified records: an identifier match wins over a name match, both
+        // compared case-insensitively, and the first match in the sequence order wins.
+        private static CredentialModelBase FindCredential(IEnumerable<CredentialModelBase> credentials, string idOrName)
+        {
+            // Materialize the records once so the identifier pass and the name pass read the same snapshot.
+            const StringComparison comparison = StringComparison.OrdinalIgnoreCase;
+            var candidates = credentials.ToArray();
+
+            // Prefer the identifier, which is unique, and fall back to the name, which two types can share.
+            return candidates.FirstOrDefault(i => string.Equals(a: i.Id, b: idOrName, comparisonType: comparison))
+                ?? candidates.FirstOrDefault(i => string.Equals(a: i.Name, b: idOrName, comparisonType: comparison));
         }
         #endregion
     }
