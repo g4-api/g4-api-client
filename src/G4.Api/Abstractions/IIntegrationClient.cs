@@ -39,8 +39,8 @@ namespace G4.Api.Abstractions
         /// </remarks>
         /// <param name="idOrName">The unique identifier or logical name of the credential.</param>
         /// <returns>
-        /// The matching record as its concrete model, such as <see cref="OAuthCredentialModel"/> or
-        /// <see cref="SqlServerCredentialModel"/>; otherwise <c>null</c>.
+        /// The matching record as its concrete model, such as <see cref="OAuthCredentialModel"/>,
+        /// <see cref="SqlServerCredentialModel"/>, or the MongoDB credential model; otherwise <c>null</c>.
         /// </returns>
         CredentialModelBase GetCredentials(string idOrName);
 

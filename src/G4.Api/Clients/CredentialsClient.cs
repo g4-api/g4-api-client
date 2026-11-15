@@ -67,6 +67,7 @@ namespace G4.Api.Clients
             // of this client. The types are listed in ordinal type-name order, which decides a shared name.
             CredentialModelBase[] credentials =
             [
+                _credentials.GetMongoDbCredentials(idOrName),
                 _credentials.GetCredentials(idOrName),
                 _credentials.GetSqlServerCredentials(idOrName)
             ];
@@ -82,6 +83,7 @@ namespace G4.Api.Clients
             // changed outside of this client.
             IEnumerable<CredentialModelBase> credentials =
             [
+                .. _credentials.GetMongoDbCredentials(),
                 .. _credentials.GetCredentials(),
                 .. _credentials.GetSqlServerCredentials()
             ];
@@ -114,6 +116,7 @@ namespace G4.Api.Clients
             // without a table in the store has no rows to remove.
             var removedCount = credential switch
             {
+                MongoDbCredentialModel => _credentials.RemoveMongoDbCredentials(idOrName: credential.Id),
                 OAuthCredentialModel => _credentials.RemoveCredentials(idOrName: credential.Id),
                 SqlServerCredentialModel => _credentials.RemoveSqlServerCredentials(idOrName: credential.Id),
                 _ => 0
