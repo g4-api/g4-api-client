@@ -35,6 +35,7 @@
 		<PackageReference Include="G4.Plugins" Version="2026.11.13.103" />
 		<PackageReference Include="G4.Plugins.Common" Version="2026.11.13.167" />
 		<PackageReference Include="G4.Plugins.Google" Version="2026.11.13.167" />
+		<PackageReference Include="G4.Plugins.MongoDb" Version="2026.11.13.167" />
 		<PackageReference Include="G4.Plugins.SqlServer" Version="2026.11.13.167" />
 		<PackageReference Include="G4.Plugins.Ui" Version="2026.11.13.167" />
 	</ItemGroup>
