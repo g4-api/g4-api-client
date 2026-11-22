@@ -84,6 +84,21 @@ namespace G4.Api.Abstractions
         event EventHandler<(RuleEventArgs EventArguments, Exception Exception)> OnRuleError;
 
         /// <summary>
+        /// Occurs after every lane of a Parallel container has finished or was stopped.
+        /// </summary>
+        /// <remarks>
+        /// The arguments carry the outcome of the container: error when at least one lane ended with an error.
+        /// The container has no entry of its own in the status or in the response, so this event and
+        /// <see cref="ParallelInvoking"/> are the only notifications that carry it.
+        /// </remarks>
+        event EventHandler<ParallelEventArgs> ParallelInvoked;
+
+        /// <summary>
+        /// Occurs before the lanes of a Parallel container start.
+        /// </summary>
+        event EventHandler<ParallelEventArgs> ParallelInvoking;
+
+        /// <summary>
         /// Occurs after a new plugin is created.
         /// </summary>
         event EventHandler<(PluginBase Plugin, G4RuleModelBase Rule)> PluginCreated;

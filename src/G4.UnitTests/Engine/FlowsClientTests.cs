@@ -165,6 +165,42 @@ namespace G4.UnitTests.Engine
             Assert.IsEmpty(client.Flows.GetFlows(FlowNamespace));
         }
 
+        [TestMethod(DisplayName = "Verify that invoking a flow that holds a Parallel container raises the container " +
+            "events once before the lanes start and once after they finish.")]
+        public void InvokeFlowRaisesParallelEventsTest()
+        {
+            // Arrange: store a flow whose only stage holds a Parallel container with the flow's job as its lane.
+            const string Key = "UnitTestFlowParallelEvents";
+            var client = new G4Client(new CacheManager());
+            CleanupFlow(client, Key);
+            var automation = NewAutomation(TestContext, "lane");
+            var stage = automation.Stages.First();
+            var container = new G4ParallelJobModel
+            {
+                Jobs = stage.Jobs,
+                Reference = new G4JobReferenceModel { Id = "parallel-1" }
+            };
+            stage.Jobs = [container];
+            client.Flows.AddFlow(NewManifest(Key, automation));
+
+            // Arrange: record each container event with its name, in the order the client raises them.
+            var events = new List<(string Name, ParallelEventArgs Arguments)>();
+            client.Flows.ParallelInvoking += (_, e) => events.Add((nameof(client.Flows.ParallelInvoking), e));
+            client.Flows.ParallelInvoked += (_, e) => events.Add((nameof(client.Flows.ParallelInvoked), e));
+
+            // Act: invoke the flow by namespace and key.
+            var (statusCode, _) = client.Flows.Invoke(FlowNamespace, Key);
+
+            // Assert: the flow ran, and the container raised one event before its lanes and one after them.
+            Assert.AreEqual(expected: 200, actual: statusCode);
+            Assert.HasCount(expected: 2, collection: events);
+            Assert.AreEqual(expected: nameof(client.Flows.ParallelInvoking), actual: events[0].Name);
+            Assert.AreEqual(expected: nameof(client.Flows.ParallelInvoked), actual: events[1].Name);
+            Assert.IsTrue(events.TrueForAll(i => i.Arguments.ParallelReference.Id == "parallel-1"));
+
+            CleanupFlow(client, Key);
+        }
+
         [TestMethod(DisplayName = "Verify that invoking a cached flow runs its automation without mutating the cached flow.")]
         public void InvokeFlowRunsCachedAutomationTest()
         {

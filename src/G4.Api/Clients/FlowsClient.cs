@@ -115,6 +115,12 @@ namespace G4.Api.Clients
         public event EventHandler<(RuleEventArgs EventArguments, Exception Exception)> OnRuleError;
 
         /// <inheritdoc />
+        public event EventHandler<ParallelEventArgs> ParallelInvoked;
+
+        /// <inheritdoc />
+        public event EventHandler<ParallelEventArgs> ParallelInvoking;
+
+        /// <inheritdoc />
         public event EventHandler<(PluginBase Plugin, G4RuleModelBase Rule)> PluginCreated;
 
         /// <inheritdoc />
@@ -837,6 +843,8 @@ namespace G4.Api.Clients
             invoker.JobInvoking += NewDelegate(client, client.JobInvoking);
             invoker.JobStatusChanged += NewDelegate(client, client.JobStatusChanged);
             invoker.OnRuleError += NewDelegate(client, client.OnRuleError);
+            invoker.ParallelInvoked += NewDelegate(client, client.ParallelInvoked);
+            invoker.ParallelInvoking += NewDelegate(client, client.ParallelInvoking);
             invoker.PluginCreated += NewDelegate(client, client.PluginCreated);
             invoker.RuleInvoked += NewDelegate(client, client.RuleInvoked);
             invoker.RuleInvoking += NewDelegate(client, client.RuleInvoking);
