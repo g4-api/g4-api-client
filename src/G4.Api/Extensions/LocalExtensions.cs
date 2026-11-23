@@ -903,6 +903,32 @@ namespace G4.Extensions
             }
         }
 
+        extension(Exception exception)
+        {
+            /// <summary>
+            /// Finds the error of a driver session that could not start among an exception and the exceptions it wraps.
+            /// </summary>
+            /// <remarks>
+            /// The automations of an invocation run as tasks, so a failure reaches the client wrapped in one or more
+            /// <see cref="AggregateException"/> layers. The first session error found is returned; it is the one
+            /// the caller must see, because nothing of that automation ran.
+            /// </remarks>
+            /// <returns>The session error, or <c>null</c> when the failure has another cause.</returns>
+            public G4SessionNotCreatedException FindSessionError()
+            {
+                // Unwrap the task layers first, so every failure of the invocation is one entry of the list
+                var failures = exception is AggregateException aggregate
+                    ? aggregate.Flatten().InnerExceptions
+                    : [exception];
+
+                // Look at each failure and at what it wraps; the session error can sit under either
+                return failures
+                    .SelectMany(failure => new[] { failure, failure?.GetBaseException() })
+                    .OfType<G4SessionNotCreatedException>()
+                    .FirstOrDefault();
+            }
+        }
+
         extension(G4AutomationModel automation)
         {
             /// <summary>
