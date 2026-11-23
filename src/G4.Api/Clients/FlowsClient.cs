@@ -3,6 +3,7 @@ using G4.Abstraction.Logging;
 using G4.Api.Abstractions;
 using G4.Api.Models;
 using G4.Cache;
+using G4.Exceptions;
 using G4.Extensions;
 using G4.Models;
 using G4.Models.Events;
@@ -19,6 +20,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -704,6 +706,15 @@ namespace G4.Api.Clients
             catch (OperationCanceledException e)
             {
                 client.Logger.LogInformation(exception: e, "The flow process was canceled by the user.");
+            }
+            // Let a driver session that could not start reach the caller. Nothing of that automation ran, so an
+            // empty response would hide a failure the caller cannot recover from; the caller reports it instead.
+            catch (Exception e) when (e.FindSessionError() is G4SessionNotCreatedException sessionError)
+            {
+                client.Logger.LogError(exception: e, "The {Process} process did not run: {Message}", "flow", sessionError.Message);
+
+                // Rethrow the session error itself, with its original stack, instead of the wrappers around it.
+                ExceptionDispatchInfo.Capture(sessionError).Throw();
             }
             // Log any other errors that occur during invocation.
             catch (Exception e)

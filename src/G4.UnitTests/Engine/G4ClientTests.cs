@@ -1,5 +1,6 @@
 ﻿using G4.Api;
 using G4.Attributes;
+using G4.Exceptions;
 using G4.Extensions;
 using G4.Models;
 using G4.Plugins.Framework;
@@ -1175,6 +1176,32 @@ namespace G4.UnitTests.Engine
             Assert.IsTrue(events.TrueForAll(i => i.Arguments.ParallelReference.Id == "parallel-1"));
             Assert.AreEqual(expected: G4QueueModel.QueueStatusCodes.Processing, actual: events[0].Arguments.Status);
             Assert.AreEqual(expected: G4QueueModel.QueueStatusCodes.Complete, actual: events[1].Arguments.Status);
+        }
+
+        [TestMethod(DisplayName = "Verify that an automation whose driver session cannot start fails the " +
+            "invocation with a session error that names the driver, instead of returning an empty response.")]
+        public void SessionNotCreatedTest()
+        {
+            // Arrange: the automation names a driver that does not exist, so no session can start.
+            const string driver = "NoSuchDriverForSessionTest";
+            var job = new G4JobModel { Rules = [new ActionRuleModel { Argument = "never", PluginName = "NoAction" }] };
+            var automation = new G4AutomationModel
+            {
+                Authentication = new AuthenticationModel { Username = $"{TestContext.Properties["G4.Username"]}" },
+                DriverParameters = new Dictionary<string, object>
+                {
+                    ["driver"] = driver,
+                    ["driverBinaries"] = "."
+                },
+                Stages = [new G4StageModel { Jobs = [job] }]
+            };
+
+            // Act: invoke the automation through the client, as the hub does.
+            var client = new G4Client();
+            var exception = Assert.ThrowsExactly<G4SessionNotCreatedException>(() => client.Automation.Invoke(automation));
+
+            // Assert: the caller gets the session error itself, and its message names the driver.
+            Assert.Contains(substring: driver, value: exception.Message);
         }
 
         [Ignore(IgnoreMessage = "This test is ignored because it requires a running MCP server.")]
