@@ -1,5 +1,6 @@
 ﻿using G4.Api;
 using G4.Attributes;
+using G4.Exceptions;
 using G4.Extensions;
 using G4.Models;
 using G4.Plugins.Framework;
@@ -1131,6 +1132,76 @@ namespace G4.UnitTests.Engine
 
             // Assert that all events have been invoked and their invocation count is greater than zero
             Assert.IsTrue(events.Values.All(i => i.Invoked && i.Count > 0));
+        }
+
+        [TestMethod(DisplayName = "Verify that the Parallel container events are raised once before the lanes " +
+            "start and once after they finish, and that both name the container.")]
+        public void ParallelEventsTest()
+        {
+            // Arrange: one stage whose jobs list holds a Parallel container with two lanes.
+            var lane = new G4JobModel { Rules = [new ActionRuleModel { Argument = "lane", PluginName = "NoAction" }] };
+            var otherLane = new G4JobModel { Rules = [new ActionRuleModel { Argument = "lane", PluginName = "NoAction" }] };
+            var container = new G4ParallelJobModel
+            {
+                Jobs = [lane, otherLane],
+                Reference = new G4JobReferenceModel { Id = "parallel-1" }
+            };
+            var automation = new G4AutomationModel
+            {
+                Authentication = new AuthenticationModel { Username = $"{TestContext.Properties["G4.Username"]}" },
+                DriverParameters = new Dictionary<string, object>
+                {
+                    ["driver"] = "SimulatorDriver",
+                    ["driverBinaries"] = "."
+                },
+                Stages = [new G4StageModel { Jobs = [container] }]
+            };
+
+            // Arrange: record each container event with its name, in the order the client raises them.
+            var events = new List<(string Name, ParallelEventArgs Arguments)>();
+            var client = new G4Client();
+            client.Automation.ParallelInvoking += (_, e) => events.Add((nameof(client.Automation.ParallelInvoking), e));
+            client.Automation.ParallelInvoked += (_, e) => events.Add((nameof(client.Automation.ParallelInvoked), e));
+
+            // Act: invoke the automation, which runs the container once.
+            client.Automation.Invoke(automation);
+
+            // Assert: one event before the lanes and one after them, in that order.
+            Assert.HasCount(expected: 2, collection: events);
+            Assert.AreEqual(expected: nameof(client.Automation.ParallelInvoking), actual: events[0].Name);
+            Assert.AreEqual(expected: nameof(client.Automation.ParallelInvoked), actual: events[1].Name);
+
+            // Assert: both events name the job-level container, and the last one reports that it completed.
+            Assert.IsTrue(events.TrueForAll(i => i.Arguments.Level == ParallelEventArgs.JobLevel));
+            Assert.IsTrue(events.TrueForAll(i => i.Arguments.ParallelReference.Id == "parallel-1"));
+            Assert.AreEqual(expected: G4QueueModel.QueueStatusCodes.Processing, actual: events[0].Arguments.Status);
+            Assert.AreEqual(expected: G4QueueModel.QueueStatusCodes.Complete, actual: events[1].Arguments.Status);
+        }
+
+        [TestMethod(DisplayName = "Verify that an automation whose driver session cannot start fails the " +
+            "invocation with a session error that names the driver, instead of returning an empty response.")]
+        public void SessionNotCreatedTest()
+        {
+            // Arrange: the automation names a driver that does not exist, so no session can start.
+            const string driver = "NoSuchDriverForSessionTest";
+            var job = new G4JobModel { Rules = [new ActionRuleModel { Argument = "never", PluginName = "NoAction" }] };
+            var automation = new G4AutomationModel
+            {
+                Authentication = new AuthenticationModel { Username = $"{TestContext.Properties["G4.Username"]}" },
+                DriverParameters = new Dictionary<string, object>
+                {
+                    ["driver"] = driver,
+                    ["driverBinaries"] = "."
+                },
+                Stages = [new G4StageModel { Jobs = [job] }]
+            };
+
+            // Act: invoke the automation through the client, as the hub does.
+            var client = new G4Client();
+            var exception = Assert.ThrowsExactly<G4SessionNotCreatedException>(() => client.Automation.Invoke(automation));
+
+            // Assert: the caller gets the session error itself, and its message names the driver.
+            Assert.Contains(substring: driver, value: exception.Message);
         }
 
         [Ignore(IgnoreMessage = "This test is ignored because it requires a running MCP server.")]
