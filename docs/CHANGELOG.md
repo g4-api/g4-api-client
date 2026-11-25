@@ -8,6 +8,20 @@ its `v` prefix and the NuGet package version.
 
 ### Added
 
+- The `G4.Plugins.*` packages 2026.11.25.178 add the Android replay plugins `InvokeLongClick` and `SwitchActivity`.
+
+### Changed
+
+- `G4.Api` uses the engine packages 2026.11.25.113, which now include `G4.Abstraction.WebDriver`, and the
+  `G4.Plugins.*` packages 2026.11.25.178. It resolves one version of every lower package: `G4.WebDriver*`
+  2026.11.25.21 and `G4.Abstraction.Cli` and `G4.Abstraction.Logging` 2026.11.25.27.
+- The release pipeline runs the unit tests again, on Windows, without the `LocalOnly` category. A failed test fails
+  the job, and the package and the GitHub release are published only after the tests pass.
+
+## 2026.11.25.78
+
+### Added
+
 - The `G4.Plugins.*` packages 2026.11.25.177 add the `InvokeMiddleClick` and `InvokeUser32MiddleClick` plugins and
   the `Relative` switch of `InvokeScroll`.
 
