@@ -30,14 +30,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="G4.Cache" Version="2026.11.24.109" />
-		<PackageReference Include="G4.CredentialsManager" Version="2026.11.24.109" />
-		<PackageReference Include="G4.Plugins" Version="2026.11.24.109" />
-		<PackageReference Include="G4.Plugins.Common" Version="2026.11.25.175" />
-		<PackageReference Include="G4.Plugins.Google" Version="2026.11.25.175" />
-		<PackageReference Include="G4.Plugins.MongoDb" Version="2026.11.25.175" />
-		<PackageReference Include="G4.Plugins.SqlServer" Version="2026.11.25.175" />
-		<PackageReference Include="G4.Plugins.Ui" Version="2026.11.25.175" />
+		<PackageReference Include="G4.Cache" Version="2026.11.25.111" />
+		<PackageReference Include="G4.CredentialsManager" Version="2026.11.25.111" />
+		<PackageReference Include="G4.Plugins" Version="2026.11.25.111" />
+		<PackageReference Include="G4.Plugins.Common" Version="2026.11.25.177" />
+		<PackageReference Include="G4.Plugins.Google" Version="2026.11.25.177" />
+		<PackageReference Include="G4.Plugins.MongoDb" Version="2026.11.25.177" />
+		<PackageReference Include="G4.Plugins.SqlServer" Version="2026.11.25.177" />
+		<PackageReference Include="G4.Plugins.Ui" Version="2026.11.25.177" />
 	</ItemGroup>
 
 </Project>
