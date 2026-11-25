@@ -104,9 +104,7 @@ jobs:
   InvokeTests:
     name: Invoke Tests & Publish Results
     runs-on: windows-latest
-    # This job will never run because it always evaluates to false
-    # if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' }}
-    if: ${{ false }}
+    if: ${{ needs.NewVersion.result == 'success' && needs.NewVersion.outputs.validVersion == 'True' }}
     needs: 
       - NewBuild
       - NewVersion
@@ -123,7 +121,7 @@ jobs:
         test-project:
           - name                  : 'G4.UnitTests'
             type                  : 'csproj'
-            filter                : ''
+            filter                : 'TestCategory!=LocalOnly'
             prefix                : 'unit-tests'
             artifact              : 'unit-tests-drop-v${{ needs.NewVersion.outputs.buildVersion }}'
             report                : 'unit-tests-results-v${{ needs.NewVersion.outputs.buildVersion }}.xml'
@@ -153,7 +151,12 @@ jobs:
         run: |
             # read test settings
             $runSettingsFile       = "${{ env.RUN_SETTINGS_FILE }}"
-            $runSettingsFilePath   = (Get-ChildItem -Path . -Filter $runSettingsFile -Recurse).FullName
+            $runSettingsFilePath   = (Get-ChildItem -Path . -Filter $runSettingsFile -Recurse | Select-Object -First 1).FullName
+            if ([string]::IsNullOrEmpty($runSettingsFilePath)) {
+                Write-Host "No $runSettingsFile file; the tests run with their defaults."
+                exit 0
+            }
+
             [xml]$runSettings      = Get-Content -Path $runSettingsFilePath
             #
             # setup
@@ -225,7 +228,8 @@ jobs:
 
           $arguments = $argumentsCollection -join " "
 
-          Start-Process -FilePath "dotnet" -ArgumentList $arguments -NoNewWindow -Wait
+          $testProcess = Start-Process -FilePath "dotnet" -ArgumentList $arguments -NoNewWindow -Wait -PassThru
+          "testExitCode=$($testProcess.ExitCode)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Host "Settings File: $testReportFilePath"
 
           $coverageXmlPath = Get-ChildItem `
@@ -278,6 +282,7 @@ jobs:
           path: ${{ env.STAGE_DIRECTORY }}/${{ matrix.test-project.prefix }}*.*
 
       - name: Publish ${{ matrix.test-project.step-title }} Summary
+        if: always()
         working-directory: ${{ env.STAGE_DIRECTORY }}
         shell: pwsh
         run: |
@@ -293,12 +298,20 @@ jobs:
               $content | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
           }
 
+      - name: Assert ${{ matrix.test-project.step-title }} Passed
+        shell: pwsh
+        run: |
+          $exitCode = "${{ steps.invoke-tests.outputs.testExitCode }}"
+          if ($exitCode -ne '0') {
+              Write-Error "dotnet test exited with code '$exitCode'; see the test summary."
+              exit 1
+          }
+
   PublishNugetPackages:
     name: Publish & Push NuGet Packages v${{ needs.NewVersion.outputs.buildVersion }}
     runs-on: ubuntu-latest
-    # This job will always run because it always evaluates to true
-    # if: ${{ needs.InvokeTests.result == 'success' || needs.InvokeTests.result == 'skipped' }}
-    if: ${{ always() }}
+    # Packages are published only after every unit test that can run on CI has passed
+    if: ${{ needs.InvokeTests.result == 'success' }}
     needs: 
       - InvokeTests
       - NewVersion
@@ -333,9 +346,7 @@ jobs:
   NewRelease:
     name: New GitHub Release Version ${{ needs.NewVersion.outputs.buildVersion }}
     runs-on: ubuntu-latest
-    # This job will always run because it always evaluates to true
-    # if: ${{ needs.PublishNugetPackages.result == 'success' }}
-    if: ${{ always() }}
+    if: ${{ needs.PublishNugetPackages.result == 'success' }}
     needs:
       - NewVersion
       - PublishNugetPackages
