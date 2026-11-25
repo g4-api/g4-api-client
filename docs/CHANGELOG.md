@@ -18,6 +18,12 @@ its `v` prefix and the NuGet package version.
 - The release pipeline runs the unit tests again, on Windows, without the `LocalOnly` category. A failed test fails
   the job, and the package and the GitHub release are published only after the tests pass.
 
+### Fixed
+
+- The integration tests are discovered again. `MultiPhaseDriverTests` declared a second `[AssemblyInitialize]`
+  method, which MSTest rejects for the whole assembly, so no integration test ran. The method set an unused
+  `TestRunId` property and is removed.
+
 ## 2026.11.25.78
 
 ### Added
