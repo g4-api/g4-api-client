@@ -19,13 +19,6 @@ namespace G4.IntegrationTests.Suites.Engine
     [TestCategory("Engine")]
     public class MultiPhaseDriverTests : TestBase
     {
-        [AssemblyInitialize]
-        public static void AssemblyInit(TestContext context)
-        {
-            // extract test run id
-            context.Properties["TestRunId"] = context.Properties["TestRunDirectory"].ToString().Split('\\').Last();
-        }
-
         [TestMethod(DisplayName = "Verify that two WebDriver instances are initiated when a " +
             "job takes the driver from its parent stage.")]
         #region *** Data Set ***
