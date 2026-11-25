@@ -161,6 +161,8 @@ This project is licensed under the [Apache License 2.0](LICENSE). By contributin
 ## Contributing and builds
 
 Build `src/G4.sln` and run its tests with the .NET 10 SDK.
-The release pipeline builds and publishes the NuGet package from `main`.
-Its test job is turned off, so run the tests locally before you merge to `main`.
+The release pipeline runs the unit tests on Windows, without the `LocalOnly` category, and publishes the NuGet
+package from `main` only when every test passes. Tests that need a resource a hosted runner does not have carry
+`[TestCategory("LocalOnly")]`; run them on your workstation. The tests need the settings file:
+`dotnet test --settings test/settings/Local.runsettings`.
 Changes are listed in the [changelog](docs/CHANGELOG.md).
