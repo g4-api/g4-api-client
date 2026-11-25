@@ -160,4 +160,7 @@ This project is licensed under the [Apache License 2.0](LICENSE). By contributin
 
 ## Contributing and builds
 
-Build tools, test commands, version numbers, Docker images and development ports are in the [build, test and release guide](../g4-github-actions/docs/build-test-release.md).
+Build `src/G4.sln` and run its tests with the .NET 10 SDK.
+The release pipeline builds and publishes the NuGet package from `main`.
+Its test job is turned off, so run the tests locally before you merge to `main`.
+Changes are listed in the [changelog](docs/CHANGELOG.md).
