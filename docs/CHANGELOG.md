@@ -4,7 +4,7 @@ All notable changes to the `G4.Api` package are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Each version heading matches a GitHub release tag without
 its `v` prefix and the NuGet package version.
 
-## Unreleased
+## 2026.11.25.80
 
 ### Added
 
